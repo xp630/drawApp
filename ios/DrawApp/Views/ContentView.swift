@@ -135,14 +135,62 @@ struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
 
-    // 同心圆：每圈同色系，不同深浅分段
+    // 同心圆：每圈同色系，6个分段
     let rings: [(hue: Color, segments: [Color], radius: CGFloat)] = [
-        (.red,    [Color(red:1.0, green:0.3, blue:0.3), Color(red:0.9, green:0.2, blue:0.2), Color(red:0.7, green:0.1, blue:0.1)], 140),
-        (.orange, [Color(red:1.0, green:0.55, blue:0.1), Color(red:0.9, green:0.45, blue:0.0), Color(red:0.75, green:0.35, blue:0.0)], 105),
-        (.yellow, [Color(red:1.0, green:0.9, blue:0.2), Color(red:0.95, green:0.8, blue:0.1), Color(red:0.8, green:0.65, blue:0.0)], 75),
-        (.green,  [Color(red:0.3, green:0.85, blue:0.3), Color(red:0.2, green:0.7, blue:0.2), Color(red:0.1, green:0.55, blue:0.1)], 50),
-        (.blue,   [Color(red:0.3, green:0.5, blue:1.0), Color(red:0.2, green:0.4, blue:0.85), Color(red:0.1, green:0.3, blue:0.7)], 35),
-        (.purple, [Color(red:0.8, green:0.3, blue:0.9), Color(red:0.65, green:0.2, blue:0.75), Color(red:0.5, green:0.1, blue:0.6)], 20)
+        // 红色系 - 6个深浅
+        (.red, [
+            Color(red:1.0, green:0.3, blue:0.3),
+            Color(red:0.95, green:0.25, blue:0.25),
+            Color(red:0.85, green:0.2, blue:0.2),
+            Color(red:0.75, green:0.15, blue:0.15),
+            Color(red:0.6, green:0.1, blue:0.1),
+            Color(red:0.45, green:0.08, blue:0.08)
+        ], 150),
+        // 橙色系 - 6个深浅
+        (.orange, [
+            Color(red:1.0, green:0.55, blue:0.1),
+            Color(red:0.95, green:0.48, blue:0.05),
+            Color(red:0.85, green:0.4, blue:0.0),
+            Color(red:0.75, green:0.35, blue:0.0),
+            Color(red:0.6, green:0.28, blue:0.0),
+            Color(red:0.5, green:0.22, blue:0.0)
+        ], 125),
+        // 黄色系 - 6个深浅
+        (.yellow, [
+            Color(red:1.0, green:0.92, blue:0.2),
+            Color(red:0.95, green:0.85, blue:0.15),
+            Color(red:0.88, green:0.75, blue:0.1),
+            Color(red:0.78, green:0.65, blue:0.05),
+            Color(red:0.65, green:0.55, blue:0.0),
+            Color(red:0.55, green:0.45, blue:0.0)
+        ], 100),
+        // 绿色系 - 6个深浅
+        (.green, [
+            Color(red:0.3, green:0.88, blue:0.3),
+            Color(red:0.25, green:0.75, blue:0.25),
+            Color(red:0.2, green:0.65, blue:0.2),
+            Color(red:0.15, green:0.55, blue:0.15),
+            Color(red:0.1, green:0.45, blue:0.1),
+            Color(red:0.08, green:0.35, blue:0.08)
+        ], 75),
+        // 蓝色系 - 6个深浅
+        (.blue, [
+            Color(red:0.3, green:0.5, blue:1.0),
+            Color(red:0.25, green:0.42, blue:0.9),
+            Color(red:0.2, green:0.35, blue:0.75),
+            Color(red:0.15, green:0.28, blue:0.6),
+            Color(red:0.1, green:0.22, blue:0.48),
+            Color(red:0.08, green:0.18, blue:0.38)
+        ], 50),
+        // 紫色系 - 6个深浅
+        (.purple, [
+            Color(red:0.82, green:0.3, blue:0.92),
+            Color(red:0.7, green:0.25, blue:0.8),
+            Color(red:0.58, green:0.2, blue:0.65),
+            Color(red:0.48, green:0.15, blue:0.52),
+            Color(red:0.38, green:0.1, blue:0.4),
+            Color(red:0.3, green:0.08, blue:0.32)
+        ], 25)
     ]
 
     var body: some View {

@@ -7,6 +7,7 @@ struct ToolbarView: View {
     @Binding var showDraftBox: Bool
     @Binding var showColorPicker: Bool
     @Binding var isToolbarVisible: Bool
+    @Binding var brushType: BrushType
 
     var onClear: () -> Void
 
@@ -31,16 +32,16 @@ struct ToolbarView: View {
                 }
             }
 
-            // 画笔粗细
+            // 画笔类型
             VStack(alignment: .leading, spacing: 8) {
                 Text("画笔")
                     .font(.caption)
                     .foregroundColor(.gray)
 
                 HStack(spacing: 12) {
-                    BrushSizeButton(width: 3, selectedWidth: $lineWidth)
-                    BrushSizeButton(width: 8, selectedWidth: $lineWidth)
-                    BrushSizeButton(width: 15, selectedWidth: $lineWidth)
+                    ForEach(BrushType.allCases, id: \.self) { type in
+                        BrushTypeButton(type: type, selectedType: $brushType)
+                    }
                 }
             }
 
@@ -104,21 +105,28 @@ struct ToolbarView: View {
     }
 }
 
-struct BrushSizeButton: View {
-    let width: CGFloat
-    @Binding var selectedWidth: CGFloat
+struct BrushTypeButton: View {
+    let type: BrushType
+    @Binding var selectedType: BrushType
 
     var isSelected: Bool {
-        selectedWidth == width
+        selectedType == type
     }
 
     var body: some View {
         Button {
-            selectedWidth = width
+            selectedType = type
         } label: {
-            Circle()
-                .fill(isSelected ? Color.blue : Color.gray)
-                .frame(width: min(width * 2, 30), height: min(width * 2, 30))
+            VStack {
+                Image(systemName: type.icon)
+                    .font(.title3)
+                Text(type.rawValue)
+                    .font(.caption2)
+            }
+            .foregroundColor(isSelected ? .white : .primary)
+            .frame(width: 50, height: 50)
+            .background(isSelected ? Color.blue : Color.clear)
+            .cornerRadius(8)
         }
     }
 }

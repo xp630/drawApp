@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var showDraftBox: Bool = false
     @State private var showColorPicker: Bool = false
     @State private var showClearConfirm: Bool = false
+    @State private var brushType: BrushType = .pen
     @StateObject private var draftStorage = DraftStorage.shared
 
     private let autoSaveInterval: TimeInterval = 30
@@ -22,6 +23,7 @@ struct ContentView: View {
                     currentColor: $currentColor,
                     lineWidth: $lineWidth,
                     isEraser: $isEraser,
+                    brushType: $brushType,
                     onSaveThumbnail: { image in
                         _ = draftStorage.saveDraft(lines: lines, thumbnail: image)
                     }
@@ -37,6 +39,7 @@ struct ContentView: View {
                             showDraftBox: $showDraftBox,
                             showColorPicker: $showColorPicker,
                             isToolbarVisible: $isToolbarVisible,
+                            brushType: $brushType,
                             onClear: {
                                 showClearConfirm = true
                             }

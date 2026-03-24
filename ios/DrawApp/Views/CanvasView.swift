@@ -5,6 +5,7 @@ struct CanvasView: View {
     @Binding var currentColor: Color
     @Binding var lineWidth: CGFloat
     @Binding var isEraser: Bool
+    @Binding var brushType: BrushType
 
     var onSaveThumbnail: ((UIImage) -> Void)?
 
@@ -18,9 +19,10 @@ struct CanvasView: View {
                         path.addLine(to: point)
                     }
                 }
+                let opacity = line.isEraser ? 1.0 : line.brushType.opacity
                 context.stroke(
                     path,
-                    with: .color(line.isEraser ? Color.white : line.color.color),
+                    with: .color(line.isEraser ? Color.white : line.color.color.opacity(opacity)),
                     style: StrokeStyle(lineWidth: line.lineWidth, lineCap: .round, lineJoin: .round)
                 )
             }
@@ -40,7 +42,8 @@ struct CanvasView: View {
                         let newLine = DrawingLine(
                             points: [point],
                             color: currentColor,
-                            lineWidth: lineWidth,
+                            lineWidth: brushType.lineWidth,
+                            brushType: brushType,
                             isEraser: isEraser
                         )
                         lines.append(newLine)

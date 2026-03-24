@@ -21,17 +21,49 @@ struct CodableColor: Codable, Equatable {
     }
 }
 
+enum BrushType: String, CaseIterable, Codable {
+    case pencil = "铅笔"
+    case pen = "钢笔"
+    case brush = "刷子"
+
+    var icon: String {
+        switch self {
+        case .pencil: return "pencil"
+        case .pen: return "pencil.tip"
+        case .brush: return "paintbrush.fill"
+        }
+    }
+
+    var lineWidth: CGFloat {
+        switch self {
+        case .pencil: return 2
+        case .pen: return 3
+        case .brush: return 8
+        }
+    }
+
+    var opacity: Double {
+        switch self {
+        case .pencil: return 0.8
+        case .pen: return 1.0
+        case .brush: return 0.6
+        }
+    }
+}
+
 struct DrawingLine: Identifiable, Equatable, Codable {
     let id = UUID()
     var points: [CGPoint]
     var color: CodableColor
     var lineWidth: CGFloat
+    var brushType: BrushType
     var isEraser: Bool = false
 
-    init(points: [CGPoint] = [], color: Color = .black, lineWidth: CGFloat = 3, isEraser: Bool = false) {
+    init(points: [CGPoint] = [], color: Color = .black, lineWidth: CGFloat = 3, brushType: BrushType = .pen, isEraser: Bool = false) {
         self.points = points
         self.color = CodableColor(color)
         self.lineWidth = lineWidth
+        self.brushType = brushType
         self.isEraser = isEraser
     }
 }

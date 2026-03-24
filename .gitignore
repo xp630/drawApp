@@ -1,0 +1,9 @@
+.claude/
+.DS_Store
+*.xcodeproj/
+*.xcworkspace/
+Pods/
+DerivedData/
+build/
+*.ipa
+*.app

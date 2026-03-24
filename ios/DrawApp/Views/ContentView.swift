@@ -141,16 +141,20 @@ struct ColorPickerSheet: View {
     @Binding var isPresented: Bool
     @State private var brightness: Double = 1.0
 
-    // 蛋糕8切片颜色：红橙黄绿青蓝紫黑
+    // 蛋糕12切片颜色：红粉橙黄浅绿绿青天蓝蓝深紫紫棕
     let cakeColors: [(name: String, r: Double, g: Double, b: Double)] = [
-        ("红", 1.0, 0.3, 0.3),
-        ("橙", 1.0, 0.55, 0.1),
-        ("黄", 1.0, 0.9, 0.2),
-        ("绿", 0.3, 0.85, 0.3),
-        ("青", 0.2, 0.8, 0.8),
-        ("蓝", 0.25, 0.45, 0.9),
-        ("紫", 0.7, 0.25, 0.85),
-        ("黑", 0.15, 0.15, 0.15)
+        ("红", 1.0, 0.25, 0.25),
+        ("粉", 1.0, 0.55, 0.6),
+        ("橙", 1.0, 0.5, 0.1),
+        ("黄", 1.0, 0.9, 0.15),
+        ("浅绿", 0.5, 0.9, 0.5),
+        ("绿", 0.25, 0.7, 0.25),
+        ("青", 0.2, 0.75, 0.75),
+        ("天蓝", 0.4, 0.6, 0.95),
+        ("蓝", 0.2, 0.4, 0.85),
+        ("深紫", 0.45, 0.15, 0.7),
+        ("紫", 0.65, 0.2, 0.8),
+        ("棕", 0.55, 0.35, 0.15)
     ]
 
     let layers = 8
@@ -173,11 +177,12 @@ struct ColorPickerSheet: View {
                         .fill(Color.white)
                         .frame(width: 30, height: 30)
 
-                    // 8个扇形切片
-                    ForEach(0..<8, id: \.self) { sliceIndex in
+                    // 12个扇形切片
+                    ForEach(0..<12, id: \.self) { sliceIndex in
                         CakeSlice(
                             sliceIndex: sliceIndex,
                             color: cakeColors[sliceIndex],
+                            nextColor: sliceIndex < 11 ? cakeColors[sliceIndex + 1] : cakeColors[0],
                             layers: layers,
                             maxRadius: 150.0
                         )
@@ -197,7 +202,7 @@ struct ColorPickerSheet: View {
 
                 // 切片颜色标签
                 HStack(spacing: 4) {
-                    ForEach(0..<8, id: \.self) { index in
+                    ForEach(0..<12, id: \.self) { index in
                         VStack(spacing: 2) {
                             Circle()
                                 .fill(Color(red: cakeColors[index].r, green: cakeColors[index].g, blue: cakeColors[index].b))
@@ -256,17 +261,18 @@ struct ColorPickerSheet: View {
     }
 }
 
-// 蛋糕扇形切片
+// 蛋糕扇形切片 - 带渐变
 struct CakeSlice: View {
     let sliceIndex: Int
     let color: (name: String, r: Double, g: Double, b: Double)
+    let nextColor: (name: String, r: Double, g: Double, b: Double)?
     let layers: Int
     let maxRadius: CGFloat
 
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let sliceAngle: Double = 45.0
+            let sliceAngle: Double = 30.0 // 360/12 = 30度每瓣
             let startAngle = Double(sliceIndex) * sliceAngle - 90
             let endAngle = startAngle + sliceAngle
 
@@ -274,21 +280,92 @@ struct CakeSlice: View {
                 ForEach(0..<layers, id: \.self) { layerIndex in
                     let innerRadius = CGFloat(layerIndex) * maxRadius / CGFloat(layers) + 15
                     let outerRadius = CGFloat(layerIndex + 1) * maxRadius / CGFloat(layers) + 15
-                    let lightness = 1.0 - (Double(layerIndex) * 0.8 / Double(layers))
+                    let lightness = 1.0 - (Double(layerIndex) * 0.75 / Double(layers))
 
-                    PieSlice(
-                        center: center,
-                        innerRadius: innerRadius,
-                        outerRadius: outerRadius,
-                        startAngle: startAngle,
-                        endAngle: endAngle
-                    )
-                    .fill(Color(
+                    // 当前颜色的渐变
+                    let currentColor = Color(
                         red: color.r * lightness,
                         green: color.g * lightness,
                         blue: color.b * lightness
-                    ))
+                    )
+
+                    if let next = nextColor {
+                        // 与下一个颜色的渐变
+                        let nextLightness = 1.0 - (Double(layerIndex) * 0.75 / Double(layers))
+                        let gradientColor = Color(
+                            red: next.r * nextLightness,
+                            green: next.g * nextLightness,
+                            blue: next.b * nextLightness
+                        )
+
+                        // 渐变扇形
+                        GradientPieSlice(
+                            center: center,
+                            innerRadius: innerRadius,
+                            outerRadius: outerRadius,
+                            startAngle: startAngle,
+                            endAngle: endAngle,
+                            color1: currentColor,
+                            color2: gradientColor
+                        )
+                    } else {
+                        // 纯色扇形（最后一个颜色）
+                        PieSlice(
+                            center: center,
+                            innerRadius: innerRadius,
+                            outerRadius: outerRadius,
+                            startAngle: startAngle,
+                            endAngle: endAngle
+                        )
+                        .fill(currentColor)
+                    }
                 }
+            }
+        }
+    }
+}
+
+// 渐变扇形
+struct GradientPieSlice: View {
+    let center: CGPoint
+    let innerRadius: CGFloat
+    let outerRadius: CGFloat
+    let startAngle: Double
+    let endAngle: Double
+    let color1: Color
+    let color2: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            let rect = geometry.size
+            let midAngle = (startAngle + endAngle) / 2
+
+            ZStack {
+                // 左半边
+                PieSlice(
+                    center: center,
+                    innerRadius: innerRadius,
+                    outerRadius: outerRadius,
+                    startAngle: startAngle,
+                    endAngle: midAngle
+                )
+                .fill(color1)
+
+                // 右半边（渐变到下一个颜色）
+                PieSlice(
+                    center: center,
+                    innerRadius: innerRadius,
+                    outerRadius: outerRadius,
+                    startAngle: midAngle,
+                    endAngle: endAngle
+                )
+                .fill(
+                    LinearGradient(
+                        colors: [color1, color2],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
             }
         }
     }

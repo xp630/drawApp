@@ -135,17 +135,40 @@ struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
 
+    let colorPalette: [Color] = [
+        .black, .gray, .white,
+        .red, .pink, .orange,
+        .yellow, .green, .blue,
+        .purple, .brown, .cyan
+    ]
+
+    let columns = [
+        GridItem(.adaptive(minimum: 70, maximum: 80), spacing: 16)
+    ]
+
     var body: some View {
         NavigationView {
             VStack {
-                ColorPicker("选择颜色", selection: $selectedColor, supportsOpacity: false)
-                    .labelsHidden()
-                    .scaleEffect(2)
-                    .padding()
+                Text("选一个颜色")
+                    .font(.title2)
+                    .padding(.top, 30)
+
+                LazyVGrid(columns: columns, spacing: 20) {
+                    ForEach(colorPalette, id: \.self) { color in
+                        ColorButton(
+                            color: color,
+                            isSelected: selectedColor == color
+                        ) {
+                            selectedColor = color
+                            isPresented = false
+                        }
+                    }
+                }
+                .padding(30)
 
                 Spacer()
             }
-            .navigationTitle("选择颜色")
+            .navigationTitle("选颜色")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -154,6 +177,25 @@ struct ColorPickerSheet: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct ColorButton: View {
+    let color: Color
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Circle()
+                .fill(color)
+                .frame(width: 60, height: 60)
+                .overlay(
+                    Circle()
+                        .stroke(isSelected ? Color.blue : Color.gray.opacity(0.3), lineWidth: isSelected ? 4 : 1)
+                )
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 1, y: 1)
         }
     }
 }

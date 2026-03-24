@@ -134,6 +134,7 @@ struct ContentView: View {
 struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
+    @State private var brightness: Double = 1.0
 
     // 同心圆：每圈同色系，8个分段，共8圈64色
     let rings: [(hue: Color, segments: [Color], radius: CGFloat)] = [
@@ -297,14 +298,31 @@ struct ColorPickerSheet: View {
                     Text("当前:")
                         .font(.headline)
                     Circle()
-                        .fill(selectedColor)
-                        .frame(width: 40, height: 40)
+                        .fill(selectedColor.opacity(brightness))
+                        .frame(width: 50, height: 50)
                         .overlay(
                             Circle()
                                 .stroke(Color.black.opacity(0.2), lineWidth: 2)
                         )
                 }
-                .padding(.top, 20)
+                .padding(.top, 15)
+
+                // 亮度滑块
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "sun.min")
+                            .foregroundColor(.gray)
+                        Slider(value: $brightness, in: 0.3...1.0)
+                            .tint(Color.orange)
+                        Image(systemName: "sun.max.fill")
+                            .foregroundColor(.yellow)
+                    }
+                    Text("亮度: \(Int(brightness * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 30)
+                .padding(.top, 10)
 
                 Spacer()
             }

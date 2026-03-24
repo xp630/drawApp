@@ -135,51 +135,94 @@ struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
 
-    // 每行同色系：红、橙、黄、绿、蓝、紫，每行3个深浅
-    let colorPalette: [[Color]] = [
-        [Color(red:0.95, green:0.3, blue:0.3), Color(red:0.8, green:0.2, blue:0.2), Color(red:0.6, green:0.1, blue:0.1)],
-        [Color(red:1.0, green:0.55, blue:0.1), Color(red:0.85, green:0.4, blue:0.0), Color(red:0.65, green:0.25, blue:0.0)],
-        [Color(red:1.0, green:0.9, blue:0.2), Color(red:0.9, green:0.75, blue:0.1), Color(red:0.75, green:0.6, blue:0.0)],
-        [Color(red:0.25, green:0.85, blue:0.25), Color(red:0.15, green:0.65, blue:0.15), Color(red:0.05, green:0.5, blue:0.05)],
-        [Color(red:0.25, green:0.45, blue:0.95), Color(red:0.15, green:0.35, blue:0.8), Color(red:0.05, green:0.25, blue:0.65)],
-        [Color(red:0.75, green:0.25, blue:0.85), Color(red:0.6, green:0.15, blue:0.7), Color(red:0.45, green:0.05, blue:0.55)]
+    // 同心圆：每圈同色系，不同深浅分段
+    let rings: [(hue: Color, segments: [Color], radius: CGFloat)] = [
+        (.red,    [Color(red:1.0, green:0.3, blue:0.3), Color(red:0.9, green:0.2, blue:0.2), Color(red:0.7, green:0.1, blue:0.1)], 140),
+        (.orange, [Color(red:1.0, green:0.55, blue:0.1), Color(red:0.9, green:0.45, blue:0.0), Color(red:0.75, green:0.35, blue:0.0)], 105),
+        (.yellow, [Color(red:1.0, green:0.9, blue:0.2), Color(red:0.95, green:0.8, blue:0.1), Color(red:0.8, green:0.65, blue:0.0)], 75),
+        (.green,  [Color(red:0.3, green:0.85, blue:0.3), Color(red:0.2, green:0.7, blue:0.2), Color(red:0.1, green:0.55, blue:0.1)], 50),
+        (.blue,   [Color(red:0.3, green:0.5, blue:1.0), Color(red:0.2, green:0.4, blue:0.85), Color(red:0.1, green:0.3, blue:0.7)], 35),
+        (.purple, [Color(red:0.8, green:0.3, blue:0.9), Color(red:0.65, green:0.2, blue:0.75), Color(red:0.5, green:0.1, blue:0.6)], 20)
     ]
-
-    let hueNames = ["红", "橙", "黄", "绿", "蓝", "紫"]
 
     var body: some View {
         NavigationView {
             VStack {
                 Text("选一个颜色")
-                    .font(.title2)
-                    .padding(.top, 30)
+                    .font(.title2.bold())
+                    .padding(.top, 20)
 
-                VStack(spacing: 16) {
-                    ForEach(0..<colorPalette.count, id: \.self) { row in
-                        HStack(spacing: 12) {
-                            Text(hueNames[row])
-                                .font(.subheadline)
+                Text("点击圆环选择颜色")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+
+                // 同心圆颜色选择器
+                ZStack {
+                    ForEach(0..<rings.count, id: \.self) { ringIndex in
+                        let ring = rings[ringIndex]
+                        let ringRadius = ring.radius
+                        let segmentAngle: Double = 360.0 / Double(ring.segments.count)
+
+                        ForEach(0..<ring.segments.count, id: \.self) { segIndex in
+                            let startAngle = Double(segIndex) * segmentAngle - 90
+                            let endAngle = startAngle + segmentAngle - 5
+
+                            Arc(startAngle: startAngle, endAngle: endAngle)
+                                .stroke(
+                                    ring.segments[segIndex],
+                                    style: StrokeStyle(lineWidth: 25, lineCap: .butt)
+                                )
+                                .frame(width: ringRadius * 2, height: ringRadius * 2)
+                                .onTapGesture {
+                                    selectedColor = ring.segments[segIndex]
+                                    isPresented = false
+                                }
+                        }
+                    }
+
+                    // 中心白色圆
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 20, height: 20)
+                        .overlay(
+                            Circle()
+                                .stroke(selectedColor == .white ? Color.blue : Color.clear, lineWidth: 2)
+                        )
+                        .onTapGesture {
+                            selectedColor = .white
+                            isPresented = false
+                        }
+                }
+                .padding(40)
+
+                // 颜色图例
+                HStack(spacing: 20) {
+                    ForEach(0..<rings.count, id: \.self) { ringIndex in
+                        VStack(spacing: 4) {
+                            Circle()
+                                .fill(rings[ringIndex].hue)
+                                .frame(width: 16, height: 16)
+                            Text(ringName(ringIndex))
+                                .font(.caption2)
                                 .foregroundColor(.gray)
-                                .frame(width: 30, alignment: .leading)
-
-                            ForEach(0..<colorPalette[row].count, id: \.self) { col in
-                                let color = colorPalette[row][col]
-                                Circle()
-                                    .fill(color)
-                                    .frame(width: 60, height: 60)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(selectedColor == color ? Color.blue : Color.clear, lineWidth: 3)
-                                    )
-                                    .onTapGesture {
-                                        selectedColor = color
-                                        isPresented = false
-                                    }
-                            }
                         }
                     }
                 }
-                .padding()
+                .padding(.top, 10)
+
+                // 当前颜色
+                HStack {
+                    Text("当前:")
+                        .font(.headline)
+                    Circle()
+                        .fill(selectedColor)
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black.opacity(0.2), lineWidth: 2)
+                        )
+                }
+                .padding(.top, 20)
 
                 Spacer()
             }
@@ -193,5 +236,31 @@ struct ColorPickerSheet: View {
                 }
             }
         }
+    }
+
+    func ringName(_ index: Int) -> String {
+        ["红", "橙", "黄", "绿", "蓝", "紫"][index]
+    }
+}
+
+// 自定义弧形
+struct Arc: Shape {
+    var startAngle: Double
+    var endAngle: Double
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+
+        path.addArc(
+            center: center,
+            radius: radius,
+            startAngle: .degrees(startAngle),
+            endAngle: .degrees(endAngle),
+            clockwise: false
+        )
+
+        return path
     }
 }

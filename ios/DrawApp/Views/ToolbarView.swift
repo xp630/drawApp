@@ -45,6 +45,19 @@ struct ToolbarView: View {
                 }
             }
 
+            // 画笔粗细
+            VStack(alignment: .leading, spacing: 8) {
+                Text("粗细")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+
+                HStack(spacing: 12) {
+                    BrushSizeButton(width: 3, selectedWidth: $lineWidth)
+                    BrushSizeButton(width: 8, selectedWidth: $lineWidth)
+                    BrushSizeButton(width: 15, selectedWidth: $lineWidth)
+                }
+            }
+
             // 橡皮擦
             Button {
                 isEraser.toggle()
@@ -127,6 +140,25 @@ struct BrushTypeButton: View {
             .frame(width: 50, height: 50)
             .background(isSelected ? Color.blue : Color.clear)
             .cornerRadius(8)
+        }
+    }
+}
+
+struct BrushSizeButton: View {
+    let width: CGFloat
+    @Binding var selectedWidth: CGFloat
+
+    var isSelected: Bool {
+        selectedWidth == width
+    }
+
+    var body: some View {
+        Button {
+            selectedWidth = width
+        } label: {
+            Circle()
+                .fill(isSelected ? Color.blue : Color.gray)
+                .frame(width: min(width * 2, 30), height: min(width * 2, 30))
         }
     }
 }

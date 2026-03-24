@@ -135,36 +135,79 @@ struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
 
-    let colorPalette: [Color] = [
-        .black, .gray, .white,
-        .red, .pink, .orange,
-        .yellow, .green, .blue,
-        .purple, .brown, .cyan
-    ]
-
-    let columns = [
-        GridItem(.adaptive(minimum: 70, maximum: 80), spacing: 16)
-    ]
-
     var body: some View {
         NavigationView {
             VStack {
                 Text("选一个颜色")
                     .font(.title2)
-                    .padding(.top, 30)
+                    .padding(.top, 40)
 
-                LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(colorPalette, id: \.self) { color in
-                        ColorButton(
-                            color: color,
-                            isSelected: selectedColor == color
-                        ) {
-                            selectedColor = color
+                // 同心圆颜色选择器
+                ZStack {
+                    // 外圈 - 红色系
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 280, height: 280)
+                        .onTapGesture {
+                            selectedColor = .red
                             isPresented = false
                         }
-                    }
+
+                    // 第二圈 - 橙色系
+                    Circle()
+                        .fill(Color.orange)
+                        .frame(width: 220, height: 220)
+                        .onTapGesture {
+                            selectedColor = .orange
+                            isPresented = false
+                        }
+
+                    // 第三圈 - 黄色系
+                    Circle()
+                        .fill(Color.yellow)
+                        .frame(width: 160, height: 160)
+                        .onTapGesture {
+                            selectedColor = .yellow
+                            isPresented = false
+                        }
+
+                    // 第四圈 - 绿色系
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 100, height: 100)
+                        .onTapGesture {
+                            selectedColor = .green
+                            isPresented = false
+                        }
+
+                    // 中心 - 蓝色
+                    Circle()
+                        .fill(Color.blue)
+                        .frame(width: 50, height: 50)
+                        .overlay(
+                            Circle()
+                                .stroke(selectedColor == .blue ? Color.white : Color.clear, lineWidth: 3)
+                        )
+                        .onTapGesture {
+                            selectedColor = .blue
+                            isPresented = false
+                        }
                 }
-                .padding(30)
+                .padding(.top, 40)
+
+                // 当前颜色提示
+                HStack {
+                    Text("当前:")
+                        .font(.headline)
+                    Circle()
+                        .fill(selectedColor)
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                        )
+                }
+                .padding(.top, 30)
 
                 Spacer()
             }
@@ -177,25 +220,6 @@ struct ColorPickerSheet: View {
                     }
                 }
             }
-        }
-    }
-}
-
-struct ColorButton: View {
-    let color: Color
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(color)
-                .frame(width: 60, height: 60)
-                .overlay(
-                    Circle()
-                        .stroke(isSelected ? Color.blue : Color.gray.opacity(0.3), lineWidth: isSelected ? 4 : 1)
-                )
-                .shadow(color: .black.opacity(0.2), radius: 2, x: 1, y: 1)
         }
     }
 }

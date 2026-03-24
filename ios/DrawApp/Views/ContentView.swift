@@ -135,79 +135,51 @@ struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
 
+    // 每行同色系：红、橙、黄、绿、蓝、紫，每行3个深浅
+    let colorPalette: [[Color]] = [
+        [Color(red:0.95, green:0.3, blue:0.3), Color(red:0.8, green:0.2, blue:0.2), Color(red:0.6, green:0.1, blue:0.1)],
+        [Color(red:1.0, green:0.55, blue:0.1), Color(red:0.85, green:0.4, blue:0.0), Color(red:0.65, green:0.25, blue:0.0)],
+        [Color(red:1.0, green:0.9, blue:0.2), Color(red:0.9, green:0.75, blue:0.1), Color(red:0.75, green:0.6, blue:0.0)],
+        [Color(red:0.25, green:0.85, blue:0.25), Color(red:0.15, green:0.65, blue:0.15), Color(red:0.05, green:0.5, blue:0.05)],
+        [Color(red:0.25, green:0.45, blue:0.95), Color(red:0.15, green:0.35, blue:0.8), Color(red:0.05, green:0.25, blue:0.65)],
+        [Color(red:0.75, green:0.25, blue:0.85), Color(red:0.6, green:0.15, blue:0.7), Color(red:0.45, green:0.05, blue:0.55)]
+    ]
+
+    let hueNames = ["红", "橙", "黄", "绿", "蓝", "紫"]
+
     var body: some View {
         NavigationView {
             VStack {
                 Text("选一个颜色")
                     .font(.title2)
-                    .padding(.top, 40)
+                    .padding(.top, 30)
 
-                // 同心圆颜色选择器
-                ZStack {
-                    // 外圈 - 红色系
-                    Circle()
-                        .fill(Color.red)
-                        .frame(width: 280, height: 280)
-                        .onTapGesture {
-                            selectedColor = .red
-                            isPresented = false
-                        }
+                VStack(spacing: 16) {
+                    ForEach(0..<colorPalette.count, id: \.self) { row in
+                        HStack(spacing: 12) {
+                            Text(hueNames[row])
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .frame(width: 30, alignment: .leading)
 
-                    // 第二圈 - 橙色系
-                    Circle()
-                        .fill(Color.orange)
-                        .frame(width: 220, height: 220)
-                        .onTapGesture {
-                            selectedColor = .orange
-                            isPresented = false
+                            ForEach(0..<colorPalette[row].count, id: \.self) { col in
+                                let color = colorPalette[row][col]
+                                Circle()
+                                    .fill(color)
+                                    .frame(width: 60, height: 60)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(selectedColor == color ? Color.blue : Color.clear, lineWidth: 3)
+                                    )
+                                    .onTapGesture {
+                                        selectedColor = color
+                                        isPresented = false
+                                    }
+                            }
                         }
-
-                    // 第三圈 - 黄色系
-                    Circle()
-                        .fill(Color.yellow)
-                        .frame(width: 160, height: 160)
-                        .onTapGesture {
-                            selectedColor = .yellow
-                            isPresented = false
-                        }
-
-                    // 第四圈 - 绿色系
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 100, height: 100)
-                        .onTapGesture {
-                            selectedColor = .green
-                            isPresented = false
-                        }
-
-                    // 中心 - 蓝色
-                    Circle()
-                        .fill(Color.blue)
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Circle()
-                                .stroke(selectedColor == .blue ? Color.white : Color.clear, lineWidth: 3)
-                        )
-                        .onTapGesture {
-                            selectedColor = .blue
-                            isPresented = false
-                        }
+                    }
                 }
-                .padding(.top, 40)
-
-                // 当前颜色提示
-                HStack {
-                    Text("当前:")
-                        .font(.headline)
-                    Circle()
-                        .fill(selectedColor)
-                        .frame(width: 30, height: 30)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.black.opacity(0.2), lineWidth: 1)
-                        )
-                }
-                .padding(.top, 30)
+                .padding()
 
                 Spacer()
             }

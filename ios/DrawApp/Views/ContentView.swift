@@ -120,7 +120,7 @@ struct ContentView: View {
                 path.lineWidth = line.lineWidth
                 path.lineCapStyle = .round
                 path.lineJoinStyle = .round
-                (line.isEraser ? UIColor.white : UIColor(line.color)).setStroke()
+                (line.isEraser ? UIColor.white : UIColor(line.color.color)).setStroke()
                 path.stroke()
             }
         }

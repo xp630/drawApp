@@ -20,7 +20,7 @@ struct CanvasView: View {
                 }
                 context.stroke(
                     path,
-                    with: .color(line.isEraser ? .white : line.color),
+                    with: .color(line.isEraser ? Color.white : line.color.color),
                     style: StrokeStyle(lineWidth: line.lineWidth, lineCap: .round, lineJoin: .round)
                 )
             }

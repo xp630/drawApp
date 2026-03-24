@@ -42,6 +42,11 @@ struct ContentView: View {
                             brushType: $brushType,
                             onClear: {
                                 showClearConfirm = true
+                            },
+                            onUndo: {
+                                if !lines.isEmpty {
+                                    lines.removeLast()
+                                }
                             }
                         )
 
@@ -136,97 +141,19 @@ struct ColorPickerSheet: View {
     @Binding var isPresented: Bool
     @State private var brightness: Double = 1.0
 
-    // 同心圆：每圈同色系，8个分段，共8圈64色
-    let rings: [(hue: Color, segments: [Color], radius: CGFloat)] = [
-        // 红色系 - 8个深浅
-        (.red, [
-            Color(red:1.0, green:0.35, blue:0.35),
-            Color(red:0.98, green:0.3, blue:0.3),
-            Color(red:0.92, green:0.25, blue:0.25),
-            Color(red:0.85, green:0.2, blue:0.2),
-            Color(red:0.75, green:0.15, blue:0.15),
-            Color(red:0.6, green:0.1, blue:0.1),
-            Color(red:0.45, green:0.08, blue:0.08),
-            Color(red:0.35, green:0.05, blue:0.05)
-        ], 165),
-        // 粉色系 - 8个深浅
-        (.pink, [
-            Color(red:1.0, green:0.55, blue:0.65),
-            Color(red:0.98, green:0.48, blue:0.58),
-            Color(red:0.92, green:0.4, blue:0.5),
-            Color(red:0.85, green:0.35, blue:0.45),
-            Color(red:0.75, green:0.28, blue:0.38),
-            Color(red:0.65, green:0.22, blue:0.32),
-            Color(red:0.5, green:0.18, blue:0.28),
-            Color(red:0.4, green:0.12, blue:0.22)
-        ], 145),
-        // 橙色系 - 8个深浅
-        (.orange, [
-            Color(red:1.0, green:0.58, blue:0.1),
-            Color(red:0.98, green:0.52, blue:0.05),
-            Color(red:0.92, green:0.45, blue:0.0),
-            Color(red:0.85, green:0.4, blue:0.0),
-            Color(red:0.75, green:0.35, blue:0.0),
-            Color(red:0.62, green:0.28, blue:0.0),
-            Color(red:0.5, green:0.22, blue:0.0),
-            Color(red:0.4, green:0.18, blue:0.0)
-        ], 125),
-        // 黄色系 - 8个深浅
-        (.yellow, [
-            Color(red:1.0, green:0.95, blue:0.25),
-            Color(red:0.98, green:0.88, blue:0.18),
-            Color(red:0.92, green:0.8, blue:0.12),
-            Color(red:0.85, green:0.72, blue:0.08),
-            Color(red:0.75, green:0.62, blue:0.05),
-            Color(red:0.65, green:0.52, blue:0.0),
-            Color(red:0.52, green:0.42, blue:0.0),
-            Color(red:0.42, green:0.35, blue:0.0)
-        ], 105),
-        // 绿色系 - 8个深浅
-        (.green, [
-            Color(red:0.35, green:0.9, blue:0.35),
-            Color(red:0.28, green:0.82, blue:0.28),
-            Color(red:0.22, green:0.72, blue:0.22),
-            Color(red:0.18, green:0.62, blue:0.18),
-            Color(red:0.12, green:0.52, blue:0.12),
-            Color(red:0.08, green:0.42, blue:0.08),
-            Color(red:0.05, green:0.35, blue:0.05),
-            Color(red:0.0, green:0.28, blue:0.0)
-        ], 85),
-        // 青色系 - 8个深浅
-        (.cyan, [
-            Color(red:0.2, green:0.85, blue:0.85),
-            Color(red:0.15, green:0.75, blue:0.75),
-            Color(red:0.1, green:0.65, blue:0.65),
-            Color(red:0.05, green:0.55, blue:0.55),
-            Color(red:0.0, green:0.45, blue:0.45),
-            Color(red:0.0, green:0.38, blue:0.38),
-            Color(red:0.0, green:0.3, blue:0.3),
-            Color(red:0.0, green:0.25, blue:0.25)
-        ], 65),
-        // 蓝色系 - 8个深浅
-        (.blue, [
-            Color(red:0.3, green:0.52, blue:1.0),
-            Color(red:0.25, green:0.45, blue:0.92),
-            Color(red:0.2, green:0.38, blue:0.8),
-            Color(red:0.15, green:0.32, blue:0.68),
-            Color(red:0.1, green:0.25, blue:0.55),
-            Color(red:0.08, green:0.2, blue:0.45),
-            Color(red:0.05, green:0.15, blue:0.35),
-            Color(red:0.0, green:0.1, blue:0.28)
-        ], 45),
-        // 紫色系 - 8个深浅
-        (.purple, [
-            Color(red:0.85, green:0.32, blue:0.95),
-            Color(red:0.75, green:0.28, blue:0.85),
-            Color(red:0.65, green:0.22, blue:0.72),
-            Color(red:0.55, green:0.18, blue:0.6),
-            Color(red:0.45, green:0.15, blue:0.5),
-            Color(red:0.38, green:0.1, blue:0.42),
-            Color(red:0.3, green:0.08, blue:0.35),
-            Color(red:0.25, green:0.05, blue:0.28)
-        ], 25)
+    // 蛋糕8切片颜色：红橙黄绿青蓝紫黑
+    let cakeColors: [(name: String, r: Double, g: Double, b: Double)] = [
+        ("红", 1.0, 0.3, 0.3),
+        ("橙", 1.0, 0.55, 0.1),
+        ("黄", 1.0, 0.9, 0.2),
+        ("绿", 0.3, 0.85, 0.3),
+        ("青", 0.2, 0.8, 0.8),
+        ("蓝", 0.25, 0.45, 0.9),
+        ("紫", 0.7, 0.25, 0.85),
+        ("黑", 0.15, 0.15, 0.15)
     ]
+
+    let layers = 8
 
     var body: some View {
         NavigationView {
@@ -235,70 +162,60 @@ struct ColorPickerSheet: View {
                     .font(.title2.bold())
                     .padding(.top, 20)
 
-                Text("点击圆环选择颜色")
+                Text("点击蛋糕切片选择颜色")
                     .font(.caption)
                     .foregroundColor(.gray)
 
-                // 同心圆颜色选择器
+                // 蛋糕颜色选择器
                 ZStack {
-                    ForEach(0..<rings.count, id: \.self) { ringIndex in
-                        let ring = rings[ringIndex]
-                        let ringRadius = ring.radius
-                        let segmentAngle: Double = 360.0 / Double(ring.segments.count)
-
-                        ForEach(0..<ring.segments.count, id: \.self) { segIndex in
-                            let startAngle = Double(segIndex) * segmentAngle - 90
-                            let endAngle = startAngle + segmentAngle - 2
-
-                            Arc(startAngle: startAngle, endAngle: endAngle)
-                                .stroke(
-                                    ring.segments[segIndex],
-                                    style: StrokeStyle(lineWidth: 22, lineCap: .round)
-                                )
-                                .frame(width: ringRadius * 2, height: ringRadius * 2)
-                                .onTapGesture {
-                                    selectedColor = ring.segments[segIndex]
-                                    isPresented = false
-                                }
-                        }
-                    }
-
-                    // 中心白色圆
+                    // 中心白点
                     Circle()
                         .fill(Color.white)
-                        .frame(width: 20, height: 20)
-                        .overlay(
-                            Circle()
-                                .stroke(selectedColor == .white ? Color.blue : Color.clear, lineWidth: 2)
+                        .frame(width: 30, height: 30)
+
+                    // 8个扇形切片
+                    ForEach(0..<8, id: \.self) { sliceIndex in
+                        CakeSlice(
+                            sliceIndex: sliceIndex,
+                            color: cakeColors[sliceIndex],
+                            layers: layers,
+                            maxRadius: 150.0
                         )
                         .onTapGesture {
-                            selectedColor = .white
+                            let lightness = 1.0 - (Double(layers / 2)) / Double(layers)
+                            let color = cakeColors[sliceIndex]
+                            selectedColor = Color(
+                                red: color.r * lightness,
+                                green: color.g * lightness,
+                                blue: color.b * lightness
+                            ).opacity(brightness)
                             isPresented = false
                         }
+                    }
                 }
                 .padding(40)
 
-                // 颜色图例
-                HStack(spacing: 20) {
-                    ForEach(0..<rings.count, id: \.self) { ringIndex in
-                        VStack(spacing: 4) {
+                // 切片颜色标签
+                HStack(spacing: 4) {
+                    ForEach(0..<8, id: \.self) { index in
+                        VStack(spacing: 2) {
                             Circle()
-                                .fill(rings[ringIndex].hue)
-                                .frame(width: 16, height: 16)
-                            Text(ringName(ringIndex))
-                                .font(.caption2)
+                                .fill(Color(red: cakeColors[index].r, green: cakeColors[index].g, blue: cakeColors[index].b))
+                                .frame(width: 14, height: 14)
+                            Text(cakeColors[index].name)
+                                .font(.system(size: 8))
                                 .foregroundColor(.gray)
                         }
                     }
                 }
-                .padding(.top, 10)
+                .padding(.top, 5)
 
                 // 当前颜色
                 HStack {
                     Text("当前:")
                         .font(.headline)
                     Circle()
-                        .fill(selectedColor.opacity(brightness))
+                        .fill(selectedColor)
                         .frame(width: 50, height: 50)
                         .overlay(
                             Circle()
@@ -337,29 +254,95 @@ struct ColorPickerSheet: View {
             }
         }
     }
+}
 
-    func ringName(_ index: Int) -> String {
-        ["红", "粉", "橙", "黄", "绿", "青", "蓝", "紫"][index]
+// 蛋糕扇形切片
+struct CakeSlice: View {
+    let sliceIndex: Int
+    let color: (name: String, r: Double, g: Double, b: Double)
+    let layers: Int
+    let maxRadius: CGFloat
+
+    var body: some View {
+        GeometryReader { geometry in
+            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            let sliceAngle: Double = 45.0
+            let startAngle = Double(sliceIndex) * sliceAngle - 90
+            let endAngle = startAngle + sliceAngle
+
+            ZStack {
+                ForEach(0..<layers, id: \.self) { layerIndex in
+                    let innerRadius = CGFloat(layerIndex) * maxRadius / CGFloat(layers) + 15
+                    let outerRadius = CGFloat(layerIndex + 1) * maxRadius / CGFloat(layers) + 15
+                    let lightness = 1.0 - (Double(layerIndex) * 0.8 / Double(layers))
+
+                    PieSlice(
+                        center: center,
+                        innerRadius: innerRadius,
+                        outerRadius: outerRadius,
+                        startAngle: startAngle,
+                        endAngle: endAngle
+                    )
+                    .fill(Color(
+                        red: color.r * lightness,
+                        green: color.g * lightness,
+                        blue: color.b * lightness
+                    ))
+                }
+            }
+        }
     }
 }
 
-// 自定义弧形
-struct Arc: Shape {
-    var startAngle: Double
-    var endAngle: Double
+// 扇形
+struct PieSlice: Shape {
+    let center: CGPoint
+    let innerRadius: CGFloat
+    let outerRadius: CGFloat
+    let startAngle: Double
+    let endAngle: Double
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
 
+        let innerStart = CGPoint(
+            x: center.x + innerRadius * cos(CGFloat(startAngle) * .pi / 180),
+            y: center.y + innerRadius * sin(CGFloat(startAngle) * .pi / 180)
+        )
+
+        let outerStart = CGPoint(
+            x: center.x + outerRadius * cos(CGFloat(startAngle) * .pi / 180),
+            y: center.y + outerRadius * sin(CGFloat(startAngle) * .pi / 180)
+        )
+
+        let outerEnd = CGPoint(
+            x: center.x + outerRadius * cos(CGFloat(endAngle) * .pi / 180),
+            y: center.y + outerRadius * sin(CGFloat(endAngle) * .pi / 180)
+        )
+
+        let innerEnd = CGPoint(
+            x: center.x + innerRadius * cos(CGFloat(endAngle) * .pi / 180),
+            y: center.y + innerRadius * sin(CGFloat(endAngle) * .pi / 180)
+        )
+
+        path.move(to: innerStart)
+        path.addLine(to: outerStart)
         path.addArc(
             center: center,
-            radius: radius,
+            radius: outerRadius,
             startAngle: .degrees(startAngle),
             endAngle: .degrees(endAngle),
             clockwise: false
         )
+        path.addLine(to: innerEnd)
+        path.addArc(
+            center: center,
+            radius: innerRadius,
+            startAngle: .degrees(endAngle),
+            endAngle: .degrees(startAngle),
+            clockwise: true
+        )
+        path.closeSubpath()
 
         return path
     }

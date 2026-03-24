@@ -10,6 +10,7 @@ struct ToolbarView: View {
     @Binding var brushType: BrushType
 
     var onClear: () -> Void
+    var onUndo: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {
@@ -97,6 +98,15 @@ struct ToolbarView: View {
 
             // 功能按钮
             VStack(spacing: 12) {
+                ToolButton(
+                    icon: "arrow.uturn.backward",
+                    label: "撤销",
+                    color: .blue,
+                    bgColor: Color.white
+                ) {
+                    onUndo()
+                }
+
                 ToolButton(
                     icon: isEraser ? "eraser.fill" : "eraser",
                     label: "橡皮擦",

@@ -15,8 +15,25 @@ struct CanvasView: View {
                 var path = Path()
                 if let firstPoint = line.points.first {
                     path.move(to: firstPoint)
-                    for point in line.points.dropFirst() {
-                        path.addLine(to: point)
+                    if line.points.count >= 3 {
+                        // Use quadratic curve for smoothness
+                        for i in 1..<line.points.count - 1 {
+                            let current = line.points[i]
+                            let next = line.points[i + 1]
+                            let midPoint = CGPoint(
+                                x: (current.x + next.x) / 2,
+                                y: (current.y + next.y) / 2
+                            )
+                            path.addQuadCurve(to: midPoint, control: current)
+                        }
+                        // Connect to last point
+                        if let last = line.points.last {
+                            path.addLine(to: last)
+                        }
+                    } else {
+                        for point in line.points.dropFirst() {
+                            path.addLine(to: point)
+                        }
                     }
                 }
                 let opacity = line.isEraser ? 1.0 : line.brushType.opacity

@@ -157,8 +157,6 @@ struct ColorPickerSheet: View {
         ("棕", 0.55, 0.35, 0.15)
     ]
 
-    let layers = 8
-
     var body: some View {
         NavigationView {
             VStack {
@@ -183,16 +181,17 @@ struct ColorPickerSheet: View {
                             sliceIndex: sliceIndex,
                             color: cakeColors[sliceIndex],
                             nextColor: sliceIndex < 11 ? cakeColors[sliceIndex + 1] : cakeColors[0],
-                            layers: layers,
                             maxRadius: 150.0
                         )
                         .onTapGesture {
-                            let lightness = 1.0 - (Double(layers / 2)) / Double(layers)
+                            // 点击时随机选择该颜色的浅、中、深色
                             let color = cakeColors[sliceIndex]
+                            let shade = Int.random(in: 0...2)
+                            let factor: Double = shade == 0 ? 0.6 : (shade == 1 ? 1.0 : 0.3)
                             selectedColor = Color(
-                                red: color.r * lightness,
-                                green: color.g * lightness,
-                                blue: color.b * lightness
+                                red: color.r * factor,
+                                green: color.g * factor,
+                                blue: color.b * factor
                             ).opacity(brightness)
                             isPresented = false
                         }
@@ -266,60 +265,71 @@ struct CakeSlice: View {
     let sliceIndex: Int
     let color: (name: String, r: Double, g: Double, b: Double)
     let nextColor: (name: String, r: Double, g: Double, b: Double)?
-    let layers: Int
     let maxRadius: CGFloat
 
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let sliceAngle: Double = 30.0 // 360/12 = 30度每瓣
+            let sliceAngle: Double = 30.0
             let startAngle = Double(sliceIndex) * sliceAngle - 90
             let endAngle = startAngle + sliceAngle
 
             ZStack {
-                ForEach(0..<layers, id: \.self) { layerIndex in
-                    let innerRadius = CGFloat(layerIndex) * maxRadius / CGFloat(layers) + 15
-                    let outerRadius = CGFloat(layerIndex + 1) * maxRadius / CGFloat(layers) + 15
-                    let lightness = 1.0 - (Double(layerIndex) * 0.75 / Double(layers))
+                // 外层 - 浅色（可点击选择浅色）
+                let outerRadius = maxRadius
+                let innerRadius = maxRadius * 0.55
 
-                    // 当前颜色的渐变
-                    let currentColor = Color(
-                        red: color.r * lightness,
-                        green: color.g * lightness,
-                        blue: color.b * lightness
+                GradientPieSlice(
+                    center: center,
+                    innerRadius: innerRadius,
+                    outerRadius: outerRadius,
+                    startAngle: startAngle,
+                    endAngle: endAngle,
+                    color1: Color(
+                        red: color.r * 0.6,
+                        green: color.g * 0.6,
+                        blue: color.b * 0.6
+                    ),
+                    color2: Color(
+                        red: color.r * 0.4,
+                        green: color.g * 0.4,
+                        blue: color.b * 0.4
                     )
+                )
 
-                    if let next = nextColor {
-                        // 与下一个颜色的渐变
-                        let nextLightness = 1.0 - (Double(layerIndex) * 0.75 / Double(layers))
-                        let gradientColor = Color(
-                            red: next.r * nextLightness,
-                            green: next.g * nextLightness,
-                            blue: next.b * nextLightness
-                        )
+                // 中层 - 主色（可点击选择主色）
+                let midOuterRadius = maxRadius * 0.52
+                let midInnerRadius = maxRadius * 0.25
 
-                        // 渐变扇形
-                        GradientPieSlice(
-                            center: center,
-                            innerRadius: innerRadius,
-                            outerRadius: outerRadius,
-                            startAngle: startAngle,
-                            endAngle: endAngle,
-                            color1: currentColor,
-                            color2: gradientColor
-                        )
-                    } else {
-                        // 纯色扇形（最后一个颜色）
-                        PieSlice(
-                            center: center,
-                            innerRadius: innerRadius,
-                            outerRadius: outerRadius,
-                            startAngle: startAngle,
-                            endAngle: endAngle
-                        )
-                        .fill(currentColor)
-                    }
-                }
+                PieSlice(
+                    center: center,
+                    innerRadius: midInnerRadius,
+                    outerRadius: midOuterRadius,
+                    startAngle: startAngle,
+                    endAngle: endAngle
+                )
+                .fill(Color(
+                    red: color.r,
+                    green: color.g,
+                    blue: color.b
+                ))
+
+                // 内层 - 深色（可点击选择深色）
+                let darkOuterRadius = maxRadius * 0.22
+                let darkInnerRadius: CGFloat = 15
+
+                PieSlice(
+                    center: center,
+                    innerRadius: darkInnerRadius,
+                    outerRadius: darkOuterRadius,
+                    startAngle: startAngle,
+                    endAngle: endAngle
+                )
+                .fill(Color(
+                    red: color.r * 0.3,
+                    green: color.g * 0.3,
+                    blue: color.b * 0.3
+                ))
             }
         }
     }

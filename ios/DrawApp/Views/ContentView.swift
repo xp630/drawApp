@@ -46,7 +46,8 @@ struct ContentView: View {
     @State private var placedShapes: [PlacedShape] = []
     @State private var selectedShapeType: ShapeType?
 
-    @State private var autoSaveEnabled: Bool = true
+    @State private var autoSaveEnabled: Bool = false
+    @State private var colorHistory: [Color] = []  // 颜色历史记录
     @StateObject private var draftStorage = DraftStorage.shared
 
     private let autoSaveInterval: TimeInterval = 30
@@ -61,7 +62,8 @@ struct ContentView: View {
                     onSave: { saveDraft() },
                     onUndo: { if !lines.isEmpty { lines.removeLast() } },
                     onExport: { exportImage() },
-                    onSettings: { /* 待实现 */ }
+                    onSettings: { /* 待实现 */ },
+                    onDraftBox: { showDraftBox = true }
                 )
                 .frame(height: 60)
 
@@ -101,25 +103,6 @@ struct ContentView: View {
                             )
                             .padding(8)
                     }
-
-                    // 右上角草稿箱按钮
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Button {
-                                showDraftBox = true
-                            } label: {
-                                Image(systemName: "folder")
-                                    .font(.title2)
-                                    .foregroundColor(.orange)
-                                    .padding(10)
-                                    .background(Color(UIColor.systemGray6).opacity(0.9))
-                                    .cornerRadius(10)
-                            }
-                            .padding()
-                        }
-                        Spacer()
-                    }
                 }
 
                 // ========== 底部工具栏 ==========
@@ -154,7 +137,7 @@ struct ContentView: View {
             .environmentObject(draftStorage)
         }
         .sheet(isPresented: $showColorPicker) {
-            ColorPickerSheet(selectedColor: $currentColor, isPresented: $showColorPicker)
+            ColorPickerSheet(selectedColor: $currentColor, isPresented: $showColorPicker, colorHistory: $colorHistory)
         }
         .sheet(isPresented: $showStylePicker) {
             StylePickerView(canvasStyle: $canvasStyle, isPresented: $showStylePicker)
@@ -251,6 +234,7 @@ struct TopToolbar: View {
     let onUndo: () -> Void
     let onExport: () -> Void
     let onSettings: () -> Void
+    let onDraftBox: () -> Void
 
     var body: some View {
         HStack(spacing: 16) {
@@ -260,7 +244,7 @@ struct TopToolbar: View {
                     onNew()
                 }
                 TopBarButton(icon: "folder", label: "草稿箱") {
-                    // 打开草稿箱
+                    onDraftBox()
                 }
             }
 
@@ -340,24 +324,26 @@ struct BottomToolbar: View {
                         .frame(width: 48, height: 48)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 20)
 
             Divider()
                 .frame(height: 50)
+                .padding(.horizontal, 12)
 
             // 画笔类型
-            HStack(spacing: 8) {
+            HStack(spacing: 16) {
                 ForEach(BrushType.allCases, id: \.self) { type in
                     BottomBrushButton(type: type, selectedType: $brushType)
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 20)
 
             Divider()
                 .frame(height: 50)
+                .padding(.horizontal, 12)
 
             // 粗细滑块
-            HStack(spacing: 8) {
+            HStack(spacing: 16) {
                 Circle()
                     .fill(Color.pink.opacity(0.5))
                     .frame(width: 6, height: 6)
@@ -368,13 +354,14 @@ struct BottomToolbar: View {
                     .fill(Color.pink.opacity(0.5))
                     .frame(width: 18, height: 18)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 20)
 
             Divider()
                 .frame(height: 50)
+                .padding(.horizontal, 12)
 
             // 特效区域
-            HStack(spacing: 8) {
+            HStack(spacing: 20) {
                 BottomToolButton(icon: "star.fill", color: .yellow) {
                     showStickerPicker = true
                 }
@@ -388,12 +375,11 @@ struct BottomToolbar: View {
                     showFramePicker = true
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 20)
         }
         .frame(height: 100)
         .background(
-            Color(UIColor.systemBackground)
-                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: -2)
+            Color.clear
         )
     }
 }
@@ -421,7 +407,7 @@ struct BottomBrushButton: View {
             Image(systemName: type.icon)
                 .font(.title3)
                 .foregroundColor(isSelected ? .white : brushColor)
-                .frame(width: 48, height: 48)
+                .frame(width: 56, height: 56)
                 .background(
                     Group {
                         if isSelected {
@@ -449,9 +435,9 @@ struct BottomToolButton: View {
             Image(systemName: icon)
                 .font(.title2)
                 .foregroundColor(color)
-                .frame(width: 48, height: 48)
+                .frame(width: 56, height: 56)
                 .background(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(color.opacity(0.15))
                 )
         }
@@ -480,199 +466,476 @@ struct DecorativeBackground: View {
     }
 }
 
-// Color Picker Sheet
+// Color Picker Sheet - 增强版
 struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
-    @State private var brightness: Double = 0.8
+    @Binding var colorHistory: [Color]
+    @State private var hue: Double = 0
+    @State private var saturation: Double = 1
+    @State private var brightness: Double = 1
+    @State private var selectedTab: Int = 1
 
-    let hueColors: [(name: String, hue: Double)] = [
-        ("红", 0.0), ("橙红", 25.0), ("橙", 35.0), ("橙黄", 50.0),
-        ("黄", 60.0), ("黄绿", 90.0), ("绿", 135.0), ("青绿", 165.0),
-        ("青", 185.0), ("蓝", 220.0), ("蓝紫", 265.0), ("紫", 285.0)
-    ]
+    // 色环标签页独立的颜色状态
+    @State private var ringColor: Color = .red
+    // RGB标签页独立的颜色状态
+    @State private var rgbColor: Color = .red
 
-    let rings: [Double] = [1.0, 0.80, 0.60, 0.40, 0.20]
+    init(selectedColor: Binding<Color>, isPresented: Binding<Bool>, colorHistory: Binding<[Color]>) {
+        self._selectedColor = selectedColor
+        self._isPresented = isPresented
+        self._colorHistory = colorHistory
+        // 从初始颜色提取 HSB 值
+        var h: CGFloat = 0
+        var s: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(selectedColor.wrappedValue).getHue(&h, saturation: &s, brightness: &b, alpha: &a)
 
-    let quickColors: [Color] = [
-        .red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .brown, .black, .gray, .white
+        // 如果饱和度或亮度为0（黑色），使用默认值
+        let finalHue = Double(h)
+        let finalSaturation = s > 0 ? Double(s) : 1.0
+        let finalBrightness = b > 0 ? Double(b) : 1.0
+
+        self._hue = State(initialValue: finalHue)
+        self._saturation = State(initialValue: finalSaturation)
+        self._brightness = State(initialValue: finalBrightness)
+
+        // 初始化各标签页颜色
+        self._ringColor = State(initialValue: Color(hue: finalHue, saturation: finalSaturation, brightness: finalBrightness))
+        self._rgbColor = State(initialValue: selectedColor.wrappedValue)
+    }
+
+    // 24色基础色盘
+    let basicColors: [Color] = [
+        // 红系
+        Color(red: 1.0, green: 0.0, blue: 0.0),     // 红
+        Color(red: 1.0, green: 0.23, blue: 0.0),      // 橙红
+        Color(red: 1.0, green: 0.5, blue: 0.0),      // 橙
+        Color(red: 1.0, green: 0.75, blue: 0.0),     // 橙黄
+        Color(red: 1.0, green: 1.0, blue: 0.0),      // 黄
+        Color(red: 0.75, green: 1.0, blue: 0.0),     // 黄绿
+        Color(red: 0.5, green: 1.0, blue: 0.0),      // 绿
+        Color(red: 0.0, green: 1.0, blue: 0.5),      // 青绿
+        Color(red: 0.0, green: 1.0, blue: 1.0),      // 青
+        Color(red: 0.0, green: 0.5, blue: 1.0),      // 蓝
+        Color(red: 0.0, green: 0.0, blue: 1.0),      // 蓝
+        Color(red: 0.5, green: 0.0, blue: 1.0),      // 蓝紫
+        Color(red: 1.0, green: 0.0, blue: 1.0),      // 紫
+        Color(red: 1.0, green: 0.0, blue: 0.5),     // 紫红
+        // 灰度系
+        Color(red: 0.9, green: 0.9, blue: 0.9),     // 浅灰
+        Color(red: 0.7, green: 0.7, blue: 0.7),     // 中灰
+        Color(red: 0.5, green: 0.5, blue: 0.5),     // 深灰
+        Color(red: 0.3, green: 0.3, blue: 0.3),     // 暗灰
+        Color(red: 0.1, green: 0.1, blue: 0.1),     // 深灰黑
+        // 暖色系
+        Color(red: 1.0, green: 0.85, blue: 0.7),   // 肤色
+        Color(red: 0.96, green: 0.87, blue: 0.7),   // 米色
+        Color(red: 0.82, green: 0.55, blue: 0.28),   // 棕色
+        Color(red: 0.55, green: 0.27, blue: 0.07),   // 深棕
+        Color(red: 0.0, green: 0.0, blue: 0.0),       // 黑
     ]
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                Text("选择颜色")
-                    .font(.title2.bold())
-                    .padding(.top, 10)
-
-                ZStack {
-                    ColorWheelRing(rings: rings, hueColors: hueColors, brightness: brightness, selectedColor: $selectedColor, isPresented: $isPresented)
-                        .frame(width: 380, height: 380)
+            VStack(spacing: 0) {
+                // Tab 选择
+                Picker("选择", selection: $selectedTab) {
+                    Text("色盘").tag(0)
+                    Text("色环").tag(1)
+                    Text("取色").tag(2)
                 }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding()
 
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 4)], spacing: 4) {
-                    ForEach(Array(hueColors.enumerated()), id: \.offset) { index, hue in
-                        Text(hue.name)
-                            .font(.system(size: 10))
+                TabView(selection: $selectedTab) {
+                    // Tab 1: 24色基础色盘
+                    colorPaletteTab
+                        .tag(0)
+
+                    // Tab 2: 色环选择器
+                    hueRingTab
+                        .tag(1)
+
+                    // Tab 3: RGB取色器
+                    rgbPickerTab
+                        .tag(2)
+                }
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+
+                // 历史颜色
+                if !colorHistory.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("最近使用")
+                            .font(.caption)
                             .foregroundColor(.gray)
-                    }
-                }
-                .padding(.horizontal, 20)
-
-                VStack(spacing: 8) {
-                    Text("快捷颜色")
-                        .font(.subheadline.bold())
-                        .foregroundColor(.gray)
-
-                    HStack(spacing: 12) {
-                        ForEach(quickColors, id: \.self) { color in
-                            Circle()
-                                .fill(color)
-                                .frame(width: 36, height: 36)
-                                .overlay(Circle().stroke(Color.black.opacity(0.1), lineWidth: 1))
-                                .onTapGesture {
-                                    selectedColor = color
-                                }
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 8)], spacing: 8) {
+                            ForEach(0..<colorHistory.count, id: \.self) { index in
+                                Circle()
+                                    .fill(colorHistory[index])
+                                    .frame(width: 40, height: 40)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Color.black.opacity(0.2), lineWidth: 1)
+                                    )
+                                    .onTapGesture {
+                                        selectColor(colorHistory[index])
+                                    }
+                            }
                         }
                     }
+                    .padding(.horizontal)
                 }
-                .padding(.top, 10)
 
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: "sun.min").foregroundColor(.gray)
-                        Slider(value: $brightness, in: 0.2...1.0).tint(.orange)
-                        Image(systemName: "sun.max.fill").foregroundColor(.yellow)
-                    }
-                    Text("亮度: \(Int(brightness * 100))%")
-                        .font(.caption).foregroundColor(.gray)
-                }
-                .padding(.horizontal, 30)
-                .padding(.top, 10)
-
+                // 当前颜色预览
                 HStack {
                     Text("当前:")
                         .font(.headline)
                     Circle()
-                        .fill(selectedColor)
-                        .frame(width: 60, height: 60)
+                        .fill(currentTabColor)
+                        .frame(width: 50, height: 50)
                         .overlay(Circle().stroke(Color.black.opacity(0.2), lineWidth: 2))
                     Spacer()
                 }
-                .padding(.horizontal, 30)
-                .padding(.top, 10)
-
-                Spacer()
+                .padding()
             }
             .navigationTitle("选颜色")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") {
+                        let newColor = currentTabColor
+                        // 添加到历史记录（使用RGB比较避免颜色对比问题）
+                        if !colorHistory.contains(where: { isSameColor($0, newColor) }) {
+                            colorHistory.insert(newColor, at: 0)
+                            if colorHistory.count > 8 {
+                                colorHistory.removeLast()
+                            }
+                        }
+                        selectedColor = newColor
                         isPresented = false
                     }
                 }
             }
         }
     }
-}
 
-struct ColorWheelRing: View {
-    let rings: [Double]
-    let hueColors: [(name: String, hue: Double)]
-    let brightness: Double
-    @Binding var selectedColor: Color
-    @Binding var isPresented: Bool
-
-    var body: some View {
-        GeometryReader { geometry in
-            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let maxRadius = min(geometry.size.width, geometry.size.height) / 2
-
-            ZStack {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 40, height: 40)
-                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
-                    .onTapGesture {
-                        selectedColor = Color.white
-                        isPresented = false
-                    }
-
-                ColorWheelRingsView(rings: rings, hueColors: hueColors, brightness: brightness, center: center, maxRadius: maxRadius, selectedColor: $selectedColor, isPresented: $isPresented)
-            }
+    // 根据当前标签页返回对应颜色
+    private var currentTabColor: Color {
+        switch selectedTab {
+        case 0: return selectedColor  // 色盘直接返回选中颜色
+        case 1: return ringColor    // 色环
+        case 2: return rgbColor     // RGB
+        default: return selectedColor
         }
     }
-}
 
-struct ColorWheelRingsView: View {
-    let rings: [Double]
-    let hueColors: [(name: String, hue: Double)]
-    let brightness: Double
-    let center: CGPoint
-    let maxRadius: CGFloat
-    @Binding var selectedColor: Color
-    @Binding var isPresented: Bool
+    // 色盘 Tab
+    private var colorPaletteTab: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                Text("基础色盘")
+                    .font(.headline)
+                    .foregroundColor(.gray)
 
-    var body: some View {
-        ColorWheelSingleRing(saturation: rings[0], brightness: brightness, outerRadius: maxRadius, innerRadius: maxRadius * 0.72, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
-        ColorWheelSingleRing(saturation: rings[1], brightness: brightness, outerRadius: maxRadius * 0.72, innerRadius: maxRadius * 0.52, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
-        ColorWheelSingleRing(saturation: rings[2], brightness: brightness, outerRadius: maxRadius * 0.52, innerRadius: maxRadius * 0.34, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
-        ColorWheelSingleRing(saturation: rings[3], brightness: brightness, outerRadius: maxRadius * 0.34, innerRadius: maxRadius * 0.18, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
-        ColorWheelSingleRing(saturation: rings[4], brightness: brightness, outerRadius: maxRadius * 0.18, innerRadius: maxRadius * 0.08, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
+                // 24色网格
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 50), spacing: 8)], spacing: 8) {
+                    ForEach(0..<24, id: \.self) { index in
+                        Circle()
+                            .fill(basicColors[index])
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black.opacity(0.1), lineWidth: 1)
+                            )
+                            .onTapGesture {
+                                selectedColor = basicColors[index]
+                            }
+                    }
+                }
+                .padding(.horizontal)
+
+                Text("点击选择颜色")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.top, 20)
+        }
+    }
+
+    // 色环 Tab
+    private var hueRingTab: some View {
+        VStack(spacing: 16) {
+            ZStack {
+                // 色环
+                HueRingView(selectedHue: $hue, saturation: $saturation, brightness: $brightness)
+                    .frame(width: 300, height: 300)
+
+                // 中心亮度/饱和度调节
+                VStack(spacing: 10) {
+                    Text("饱和度")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    Slider(value: $saturation, in: 0...1)
+                        .frame(width: 140)
+                        .tint(.orange)
+
+                    Text("亮度")
+                        .font(.subheadline)
+                        .foregroundColor(.gray)
+                    Slider(value: $brightness, in: 0...1)
+                        .frame(width: 140)
+                        .tint(.yellow)
+                }
+            }
+            .onChange(of: hue) { _ in
+                ringColor = Color(hue: hue, saturation: saturation, brightness: brightness)
+            }
+            .onChange(of: saturation) { _ in
+                ringColor = Color(hue: hue, saturation: saturation, brightness: brightness)
+            }
+            .onChange(of: brightness) { _ in
+                ringColor = Color(hue: hue, saturation: saturation, brightness: brightness)
+            }
+
+            Spacer()
+        }
+        .padding(.top, 20)
+    }
+
+    // RGB取色 Tab
+    private var rgbPickerTab: some View {
+        VStack(spacing: 20) {
+            // 颜色预览大方块
+            RoundedRectangle(cornerRadius: 12)
+                .fill(rgbColor)
+                .frame(height: 80)
+                .padding(.horizontal)
+
+            // RGB滑块
+            VStack(spacing: 12) {
+                HStack {
+                    Text("红")
+                        .foregroundColor(.red)
+                        .frame(width: 30)
+                    Slider(value: Binding(
+                        get: { getRgbRed() },
+                        set: { newRed in
+                            rgbColor = Color(red: newRed, green: getRgbGreen(), blue: getRgbBlue())
+                        }
+                    ), in: 0...1)
+                    .tint(.red)
+                }
+
+                HStack {
+                    Text("绿")
+                        .foregroundColor(.green)
+                        .frame(width: 30)
+                    Slider(value: Binding(
+                        get: { getRgbGreen() },
+                        set: { newGreen in
+                            rgbColor = Color(red: getRgbRed(), green: newGreen, blue: getRgbBlue())
+                        }
+                    ), in: 0...1)
+                    .tint(.green)
+                }
+
+                HStack {
+                    Text("蓝")
+                        .foregroundColor(.blue)
+                        .frame(width: 30)
+                    Slider(value: Binding(
+                        get: { getRgbBlue() },
+                        set: { newBlue in
+                            rgbColor = Color(red: getRgbRed(), green: getRgbGreen(), blue: newBlue)
+                        }
+                    ), in: 0...1)
+                    .tint(.blue)
+                }
+            }
+            .padding(.horizontal)
+
+            Spacer()
+        }
+        .padding(.top, 20)
+    }
+
+    // Helper functions
+    private func updateColorFromHSB() {
+        ringColor = Color(hue: hue, saturation: saturation, brightness: brightness)
+    }
+
+    private func selectColor(_ color: Color) {
+        // 根据当前标签页更新对应颜色
+        switch selectedTab {
+        case 0: selectedColor = color  // 色盘
+        case 1:
+            // 色环 - 提取HSB并更新
+            var h: CGFloat = 0
+            var s: CGFloat = 0
+            var b: CGFloat = 0
+            var a: CGFloat = 0
+            UIColor(color).getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+            hue = Double(h)
+            saturation = s > 0 ? Double(s) : 1.0
+            brightness = b > 0 ? Double(b) : 1.0
+            ringColor = color
+        case 2:
+            rgbColor = color  // RGB
+        default:
+            break
+        }
+    }
+
+    // 比较两个颜色是否相同（RGB比较）
+    private func isSameColor(_ c1: Color, _ c2: Color) -> Bool {
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        UIColor(c1).getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
+        UIColor(c2).getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
+        return abs(r1 - r2) < 0.01 && abs(g1 - g2) < 0.01 && abs(b1 - b2) < 0.01
+    }
+
+    private func getRed() -> Double {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(selectedColor).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return Double(r)
+    }
+
+    private func getGreen() -> Double {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(selectedColor).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return Double(g)
+    }
+
+    private func getBlue() -> Double {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(selectedColor).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return Double(b)
+    }
+
+    // RGB picker 专用
+    private func getRgbRed() -> Double {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(rgbColor).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return Double(r)
+    }
+
+    private func getRgbGreen() -> Double {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(rgbColor).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return Double(g)
+    }
+
+    private func getRgbBlue() -> Double {
+        var r: CGFloat = 0
+        var g: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
+        UIColor(rgbColor).getRed(&r, green: &g, blue: &b, alpha: &a)
+        return Double(b)
     }
 }
 
-struct ColorWheelSingleRing: View {
-    let saturation: Double
-    let brightness: Double
-    let outerRadius: CGFloat
-    let innerRadius: CGFloat
-    let hueColors: [(name: String, hue: Double)]
-    let center: CGPoint
-    @Binding var selectedColor: Color
-    @Binding var isPresented: Bool
+// 色环视图
+struct HueRingView: View {
+    @Binding var selectedHue: Double
+    @Binding var saturation: Double
+    @Binding var brightness: Double
+
+    let hueColors: [Color] = [
+        .red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .red
+    ]
+
+    private let ringSize: CGFloat = 300
+    private let ringWidth: CGFloat = 40
+    private let center: CGFloat = 150
+    private let indicatorRadius: CGFloat = 130
 
     var body: some View {
         ZStack {
-            ForEach(0..<12, id: \.self) { hueIndex in
-                let hue = hueColors[hueIndex].hue
-                let sliceAngle = 30.0
-                let startAngle = Double(hueIndex) * sliceAngle - 90
-                let endAngle = startAngle + sliceAngle
+            // 色环 - 从顶部(12点钟)开始，顺时针颜色变化
+            Circle()
+                .trim(from: 0, to: 1)
+                .stroke(
+                    AngularGradient(gradient: Gradient(colors: hueColors), center: .center, startAngle: .degrees(-90), endAngle: .degrees(270)),
+                    style: StrokeStyle(lineWidth: ringWidth, lineCap: .butt)
+                )
+                .frame(width: ringSize, height: ringSize)
 
-                PieSlice(center: center, innerRadius: innerRadius, outerRadius: outerRadius, startAngle: startAngle, endAngle: endAngle)
-                    .fill(Color(hue: hue / 360, saturation: saturation, brightness: brightness))
-                    .onTapGesture {
-                        selectedColor = Color(hue: hue / 360, saturation: saturation, brightness: brightness)
-                        isPresented = false
-                    }
-            }
+            // 白色内圆
+            Circle()
+                .fill(Color.white)
+                .frame(width: ringSize - ringWidth * 2 - 20, height: ringSize - ringWidth * 2 - 20)
+
+            // 选中颜色指示器
+            Circle()
+                .fill(Color(hue: selectedHue, saturation: saturation, brightness: brightness))
+                .frame(width: 32, height: 32)
+                .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 2)
+                .position(indicatorPosition)
+
+            // 透明拖拽区域
+            Circle()
+                .fill(Color.clear)
+                .frame(width: ringSize, height: ringSize)
+                .contentShape(Circle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            updateHueFromLocation(value.location)
+                        }
+                )
         }
     }
-}
 
-struct PieSlice: Shape {
-    let center: CGPoint
-    let innerRadius: CGFloat
-    let outerRadius: CGFloat
-    let startAngle: Double
-    let endAngle: Double
+    private func updateHueFromLocation(_ location: CGPoint) {
+        let dx = location.x - center
+        let dy = location.y - center
+        let distance = sqrt(dx * dx + dy * dy)
 
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let innerStart = CGPoint(x: center.x + innerRadius * cos(CGFloat(startAngle) * .pi / 180), y: center.y + innerRadius * sin(CGFloat(startAngle) * .pi / 180))
-        let outerStart = CGPoint(x: center.x + outerRadius * cos(CGFloat(startAngle) * .pi / 180), y: center.y + outerRadius * sin(CGFloat(startAngle) * .pi / 180))
-        let outerEnd = CGPoint(x: center.x + outerRadius * cos(CGFloat(endAngle) * .pi / 180), y: center.y + outerRadius * sin(CGFloat(endAngle) * .pi / 180))
-        let innerEnd = CGPoint(x: center.x + innerRadius * cos(CGFloat(endAngle) * .pi / 180), y: center.y + innerRadius * sin(CGFloat(endAngle) * .pi / 180))
+        // 只在色环区域内响应
+        let innerRadius = indicatorRadius - ringWidth / 2 - 10
+        let outerRadius = indicatorRadius + ringWidth / 2 + 10
+        guard distance > innerRadius && distance < outerRadius else { return }
 
-        path.move(to: innerStart)
-        path.addLine(to: outerStart)
-        path.addArc(center: center, radius: outerRadius, startAngle: .degrees(startAngle), endAngle: .degrees(endAngle), clockwise: false)
-        path.addLine(to: innerEnd)
-        path.addArc(center: center, radius: innerRadius, startAngle: .degrees(endAngle), endAngle: .degrees(startAngle), clockwise: true)
-        path.closeSubpath()
-        return path
+        // atan2: 顶部=-π/2, 右=0, 底部=π/2, 左=±π
+        // 转换到hue: 顶部=0, 右=0.25, 底=0.5, 左=0.75
+        var angle = atan2(dy, dx)
+
+        // 转换为hue: hue = (π/2 - angle) / 2π
+        var hue = (.pi / 2 - angle) / (2 * .pi)
+        if hue < 0 { hue += 1 }
+        if hue > 1 { hue -= 1 }
+
+        selectedHue = hue
+    }
+
+    private var indicatorPosition: CGPoint {
+        // hue 0 → 角度-π/2 (顶部)
+        // hue 0.25 → 角度0 (右)
+        // hue 0.5 → 角度π/2 (底)
+        let angle = -(.pi / 2) + selectedHue * 2 * .pi
+        return CGPoint(
+            x: center + indicatorRadius * Darwin.cos(angle),
+            y: center + indicatorRadius * Darwin.sin(angle)
+        )
     }
 }
 

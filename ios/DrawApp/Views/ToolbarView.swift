@@ -3,159 +3,180 @@ import SwiftUI
 struct ToolbarView: View {
     @Binding var selectedColor: Color
     @Binding var lineWidth: CGFloat
-    @Binding var isEraser: Bool
-    @Binding var showDraftBox: Bool
     @Binding var showColorPicker: Bool
+    @Binding var showStylePicker: Bool
+    @Binding var showStickerPicker: Bool
+    @Binding var showFramePicker: Bool
+    @Binding var showShapePicker: Bool
     @Binding var isToolbarVisible: Bool
     @Binding var brushType: BrushType
+    var selectedShapeType: ShapeType?
+    var canvasStyle: CanvasStyle = .normal
 
-    var onClear: () -> Void
     var onUndo: () -> Void
+    var onExport: () -> Void
+
+    // 当前工具状态
+    private var currentToolIcon: String {
+        if let shape = selectedShapeType { return shape.icon }
+        return brushType.icon
+    }
+
+    private var currentToolName: String {
+        ""
+    }
+
+    private var currentToolColor: Color {
+        if selectedShapeType != nil { return .purple }
+        return brushType.isEraser ? .blue : .orange
+    }
+
+    // MARK: - 颜色配置
+    private var cardBackground: Color {
+        canvasStyle == .sketch ? Color(white: 0.95) : Color.white
+    }
+    private var cardShadow: Color {
+        canvasStyle == .sketch ? Color.black.opacity(0.05) : Color.black.opacity(0.08)
+    }
 
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 0) {
             // 顶部标题
             HStack {
                 Image(systemName: "paintbrush.fill")
                     .font(.title2)
                     .foregroundColor(.orange)
-                Text("画板工具")
-                    .font(.headline)
+                Spacer()
             }
+            .padding(.horizontal, 12)
             .padding(.top, 10)
+            .padding(.bottom, 8)
 
-            Divider()
-
-            // 颜色选择
+            // 主内容区域 - 自适应分布
             VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "paintpalette.fill")
-                        .foregroundColor(.pink)
-                    Text("颜色")
-                        .font(.subheadline.bold())
-                    Spacer()
-                }
+                // ========== 1. 绘画工具 ==========
+                VStack(spacing: 8) {
+                    // 颜色选择
+                    Button {
+                        showColorPicker = true
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(selectedColor)
+                                .frame(width: 44, height: 44)
+                                .shadow(color: cardShadow, radius: 3, x: 0, y: 2)
+                            Circle()
+                                .stroke(Color.white, lineWidth: 3)
+                                .frame(width: 44, height: 44)
+                        }
+                    }
 
-                Button {
-                    showColorPicker = true
-                } label: {
-                    HStack {
+                    // 画笔类型
+                    HStack(spacing: 6) {
+                        ForEach(BrushType.allCases, id: \.self) { type in
+                            BrushTypeButton(type: type, selectedType: $brushType)
+                        }
+                    }
+
+                    // 粗细滑块
+                    HStack(spacing: 6) {
                         Circle()
-                            .fill(selectedColor)
-                            .frame(width: 40, height: 40)
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.black.opacity(0.2), lineWidth: 2)
-                            )
-                        Text("选择颜色")
-                            .font(.subheadline)
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Image(systemName: "chevron.right")
+                            .fill(Color.pink.opacity(0.5))
+                            .frame(width: 5, height: 5)
+                        Slider(value: $lineWidth, in: 1...30, step: 1)
+                            .tint(.pink)
+                        Circle()
+                            .fill(Color.pink.opacity(0.5))
+                            .frame(width: 14, height: 14)
+                    }
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(cardBackground)
+                        .shadow(color: cardShadow, radius: 3, x: 0, y: 2)
+                )
+
+                // ========== 2. 特效 ==========
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ToolCard(
+                            icon: "star.fill",
+                            iconColor: .yellow,
+                            bgColor: Color.yellow.opacity(0.2)
+                        ) {
+                            showStickerPicker = true
+                        }
+
+                        ToolCard(
+                            icon: "square.on.circle",
+                            iconColor: .blue,
+                            bgColor: Color.blue.opacity(0.2)
+                        ) {
+                            showShapePicker = true
+                        }
+                    }
+                }
+
+                // ========== 3. 画布 ==========
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ToolCard(
+                            icon: "sparkles",
+                            iconColor: .purple,
+                            bgColor: Color.purple.opacity(0.2)
+                        ) {
+                            showStylePicker = true
+                        }
+
+                        ToolCard(
+                            icon: "square.dashed",
+                            iconColor: .orange,
+                            bgColor: Color.orange.opacity(0.2)
+                        ) {
+                            showFramePicker = true
+                        }
+                    }
+                }
+
+                // ========== 4. 操作 ==========
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        ToolCard(
+                            icon: "arrow.uturn.backward",
+                            iconColor: .cyan,
+                            bgColor: Color.cyan.opacity(0.2)
+                        ) {
+                            onUndo()
+                        }
+
+                        ToolCard(
+                            icon: "square.and.arrow.down",
+                            iconColor: .green,
+                            bgColor: Color.green.opacity(0.2)
+                        ) {
+                            onExport()
+                        }
+                    }
+                }
+
+                // 隐藏按钮
+                HStack {
+                    Spacer()
+                    Button {
+                        isToolbarVisible = false
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.body)
                             .foregroundColor(.gray)
-                    }
-                    .padding(12)
-                    .background(Color.white)
-                    .cornerRadius(12)
-                }
-            }
-
-            // 画笔类型
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "pencil.tip")
-                        .foregroundColor(.blue)
-                    Text("画笔")
-                        .font(.subheadline.bold())
-                    Spacer()
-                }
-
-                HStack(spacing: 8) {
-                    ForEach(BrushType.allCases, id: \.self) { type in
-                        BrushTypeButton(type: type, selectedType: $brushType)
+                            .padding(8)
                     }
                 }
             }
-
-            // 画笔粗细
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "lineweight")
-                        .foregroundColor(.purple)
-                    Text("粗细")
-                        .font(.subheadline.bold())
-                    Spacer()
-                }
-
-                HStack(spacing: 16) {
-                    BrushSizeButton(width: 3, selectedWidth: $lineWidth, label: "细")
-                    BrushSizeButton(width: 8, selectedWidth: $lineWidth, label: "中")
-                    BrushSizeButton(width: 15, selectedWidth: $lineWidth, label: "粗")
-                }
-            }
-
-            Divider()
-
-            // 功能按钮
-            VStack(spacing: 12) {
-                ToolButton(
-                    icon: "arrow.uturn.backward",
-                    label: "撤销",
-                    color: .blue,
-                    bgColor: Color.white
-                ) {
-                    onUndo()
-                }
-
-                ToolButton(
-                    icon: isEraser ? "eraser.fill" : "eraser",
-                    label: "橡皮擦",
-                    color: isEraser ? .blue : .primary,
-                    bgColor: isEraser ? Color.blue.opacity(0.15) : Color.white
-                ) {
-                    isEraser.toggle()
-                }
-
-                ToolButton(
-                    icon: "trash",
-                    label: "清空画布",
-                    color: .red,
-                    bgColor: Color.white
-                ) {
-                    onClear()
-                }
-
-                ToolButton(
-                    icon: "folder",
-                    label: "草稿箱",
-                    color: .orange,
-                    bgColor: Color.white
-                ) {
-                    showDraftBox = true
-                }
-            }
-
-            Spacer()
-
-            // 关闭按钮
-            Button {
-                isToolbarVisible = false
-            } label: {
-                HStack {
-                    Image(systemName: "chevron.left")
-                    Text("隐藏工具栏")
-                        .font(.subheadline)
-                }
-                .foregroundColor(.gray)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 16)
-                .background(Color.white)
-                .cornerRadius(20)
-            }
+            .padding(.horizontal, 10)
         }
-        .padding()
-        .frame(width: 200)
-        .background(Color(UIColor.systemGray6))
+        .frame(width: 160)
+        .background(canvasStyle.backgroundColor)
     }
 }
 
@@ -167,76 +188,68 @@ struct BrushTypeButton: View {
         selectedType == type
     }
 
-    var body: some View {
-        Button {
-            selectedType = type
-        } label: {
-            VStack(spacing: 4) {
-                Image(systemName: type.icon)
-                    .font(.title3)
-                Text(type.rawValue)
-                    .font(.caption2)
-            }
-            .foregroundColor(isSelected ? .white : .primary)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(isSelected ? Color.blue : Color.white)
-            .cornerRadius(10)
+    private var brushColor: Color {
+        switch type {
+        case .pencil: return Color.gray
+        case .pen: return Color.blue
+        case .brush: return Color.orange
+        case .eraser: return Color.pink
         }
-    }
-}
-
-struct BrushSizeButton: View {
-    let width: CGFloat
-    @Binding var selectedWidth: CGFloat
-    let label: String
-
-    var isSelected: Bool {
-        selectedWidth == width
     }
 
     var body: some View {
         Button {
-            selectedWidth = width
+            selectedType = type
+            SoundService.shared.playToolSelectSound()
         } label: {
-            VStack(spacing: 4) {
-                Circle()
-                    .fill(isSelected ? Color.blue : Color.gray)
-                    .frame(width: min(width * 2, 28), height: min(width * 2, 28))
-                Text(label)
-                    .font(.caption2)
-                    .foregroundColor(isSelected ? .blue : .gray)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.blue.opacity(0.1) : Color.clear)
-            .cornerRadius(8)
+            Image(systemName: type.icon)
+                .font(.body)
+                .foregroundColor(isSelected ? .white : brushColor)
+                .frame(width: 34, height: 34)
+                .background(
+                    Group {
+                        if isSelected {
+                            Circle()
+                                .fill(
+                                LinearGradient(
+                                    colors: [brushColor, brushColor.opacity(0.8)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .shadow(color: brushColor.opacity(0.4), radius: 3, x: 0, y: 2)
+                        } else {
+                            Circle()
+                                .fill(Color.white)
+                                .shadow(color: Color.black.opacity(0.08), radius: 2, x: 0, y: 1)
+                        }
+                    }
+                )
         }
     }
 }
 
-struct ToolButton: View {
+// MARK: - 工具卡片组件
+struct ToolCard: View {
     let icon: String
-    let label: String
-    let color: Color
+    let iconColor: Color
     let bgColor: Color
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            HStack {
+            VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.title3)
-                    .foregroundColor(color)
-                    .frame(width: 30)
-                Text(label)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                Spacer()
+                    .foregroundColor(iconColor)
             }
-            .padding(12)
-            .background(bgColor)
-            .cornerRadius(12)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(bgColor)
+                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+            )
         }
     }
 }

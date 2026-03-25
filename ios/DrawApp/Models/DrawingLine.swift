@@ -19,18 +19,26 @@ struct CodableColor: Codable, Equatable {
     var color: Color {
         Color(red: red, green: green, blue: blue, opacity: alpha)
     }
+
+    /// 转换为灰度（用于素描效果）
+    var grayLevel: Double {
+        // 使用标准灰度转换公式
+        return red * 0.299 + green * 0.587 + blue * 0.114
+    }
 }
 
 enum BrushType: String, CaseIterable, Codable {
     case pencil = "铅笔"
     case pen = "钢笔"
     case brush = "刷子"
+    case eraser = "橡皮擦"
 
     var icon: String {
         switch self {
         case .pencil: return "pencil"
         case .pen: return "pencil.tip"
         case .brush: return "paintbrush.fill"
+        case .eraser: return "eraser"
         }
     }
 
@@ -39,6 +47,7 @@ enum BrushType: String, CaseIterable, Codable {
         case .pencil: return 2
         case .pen: return 3
         case .brush: return 8
+        case .eraser: return 15
         }
     }
 
@@ -47,7 +56,12 @@ enum BrushType: String, CaseIterable, Codable {
         case .pencil: return 0.8
         case .pen: return 1.0
         case .brush: return 0.6
+        case .eraser: return 1.0
         }
+    }
+
+    var isEraser: Bool {
+        self == .eraser
     }
 }
 

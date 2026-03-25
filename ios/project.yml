@@ -1,4 +1,4 @@
-name: DrawApp
+name: MoaArt
 options:
   bundleIdPrefix: com.drawapp
   deploymentTarget:
@@ -12,7 +12,7 @@ settings:
     SWIFT_VERSION: "5.9"
 
 targets:
-  DrawApp:
+  MoaArt:
     type: application
     platform: iOS
     sources:

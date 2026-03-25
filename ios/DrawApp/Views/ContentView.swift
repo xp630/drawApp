@@ -1,84 +1,149 @@
 import SwiftUI
 
+// 画布风格
+enum CanvasStyle: String, CaseIterable {
+    case normal = "彩色"
+    case sketch = "素描"
+
+    var backgroundColor: Color {
+        switch self {
+        case .normal: return .white
+        case .sketch: return Color(white: 0.93)
+        }
+    }
+
+    var lineOpacity: Double {
+        switch self {
+        case .normal: return 1.0
+        case .sketch: return 0.65
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .normal: return "标准绘画效果"
+        case .sketch: return "灰色调铅笔画效果"
+        }
+    }
+}
+
 struct ContentView: View {
     @State private var lines: [DrawingLine] = []
     @State private var currentColor: Color = .black
     @State private var lineWidth: CGFloat = 3
-    @State private var isEraser: Bool = false
-    @State private var isToolbarVisible: Bool = true
+    @State private var brushType: BrushType = .pen
+    @State private var canvasStyle: CanvasStyle = .normal
+
     @State private var showDraftBox: Bool = false
     @State private var showColorPicker: Bool = false
-    @State private var showClearConfirm: Bool = false
-    @State private var brushType: BrushType = .pen
+    @State private var showStylePicker: Bool = false
+    @State private var showStickerPicker: Bool = false
+    @State private var showFramePicker: Bool = false
+    @State private var showShapePicker: Bool = false
+
+    @State private var placedStickers: [PlacedSticker] = []
+    @State private var selectedFrame: FrameType = .none
+    @State private var placedShapes: [PlacedShape] = []
+    @State private var selectedShapeType: ShapeType?
+
+    @State private var autoSaveEnabled: Bool = true
     @StateObject private var draftStorage = DraftStorage.shared
 
     private let autoSaveInterval: TimeInterval = 30
+    @State private var lastSavedLines: [DrawingLine] = []
 
     var body: some View {
         GeometryReader { geometry in
-            ZStack {
-                // 画布区域
-                CanvasView(
-                    lines: $lines,
-                    currentColor: $currentColor,
-                    lineWidth: $lineWidth,
-                    isEraser: $isEraser,
-                    brushType: $brushType,
-                    onSaveThumbnail: { image in
-                        _ = draftStorage.saveDraft(lines: lines, thumbnail: image)
-                    }
+            VStack(spacing: 0) {
+                // ========== 顶部栏 ==========
+                TopToolbar(
+                    onNew: { lines = [] },
+                    onSave: { saveDraft() },
+                    onUndo: { if !lines.isEmpty { lines.removeLast() } },
+                    onExport: { exportImage() },
+                    onSettings: { /* 待实现 */ }
                 )
+                .frame(height: 60)
 
-                // 工具栏
-                if isToolbarVisible {
-                    HStack(spacing: 0) {
-                        ToolbarView(
-                            selectedColor: $currentColor,
-                            lineWidth: $lineWidth,
-                            isEraser: $isEraser,
-                            showDraftBox: $showDraftBox,
-                            showColorPicker: $showColorPicker,
-                            isToolbarVisible: $isToolbarVisible,
-                            brushType: $brushType,
-                            onClear: {
-                                showClearConfirm = true
-                            },
-                            onUndo: {
-                                if !lines.isEmpty {
-                                    lines.removeLast()
-                                }
-                            }
-                        )
+                // ========== 中央画布 ==========
+                ZStack {
+                    CanvasView(
+                        lines: $lines,
+                        currentColor: $currentColor,
+                        lineWidth: $lineWidth,
+                        brushType: $brushType,
+                        placedStickers: $placedStickers,
+                        placedShapes: $placedShapes,
+                        selectedShapeType: $selectedShapeType,
+                        canvasStyle: canvasStyle,
+                        onSaveThumbnail: { image in
+                            _ = draftStorage.saveDraft(lines: lines, thumbnail: image)
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(canvasStyle.backgroundColor)
+                            .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 2)
+                    )
+                    .padding(8)
 
-                        Spacer()
+                    // 相框
+                    if selectedFrame != .none {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                LinearGradient(
+                                    colors: selectedFrame.frameColors,
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: selectedFrame.frameWidth
+                            )
+                            .padding(8)
                     }
-                }
 
-                // 打开工具栏按钮
-                if !isToolbarVisible {
+                    // 右上角草稿箱按钮
                     VStack {
                         HStack {
-                            Button {
-                                isToolbarVisible = true
-                            } label: {
-                                Image(systemName: "chevron.right")
-                                    .font(.title)
-                                    .foregroundColor(.gray)
-                                    .padding()
-                                    .background(Color(UIColor.systemGray6))
-                                    .cornerRadius(8)
-                            }
                             Spacer()
+                            Button {
+                                showDraftBox = true
+                            } label: {
+                                Image(systemName: "folder")
+                                    .font(.title2)
+                                    .foregroundColor(.orange)
+                                    .padding(10)
+                                    .background(Color(UIColor.systemGray6).opacity(0.9))
+                                    .cornerRadius(10)
+                            }
+                            .padding()
                         }
                         Spacer()
                     }
-                    .padding()
                 }
+
+                // ========== 底部工具栏 ==========
+                BottomToolbar(
+                    selectedColor: $currentColor,
+                    lineWidth: $lineWidth,
+                    brushType: $brushType,
+                    showColorPicker: $showColorPicker,
+                    showStylePicker: $showStylePicker,
+                    showStickerPicker: $showStickerPicker,
+                    showFramePicker: $showFramePicker,
+                    showShapePicker: $showShapePicker,
+                    canvasStyle: canvasStyle,
+                    onUndo: { if !lines.isEmpty { lines.removeLast() } },
+                    onExport: { exportImage() }
+                )
+                .frame(height: 100)
             }
+            .background(Color(UIColor.systemGroupedBackground))
         }
         .sheet(isPresented: $showDraftBox) {
             DraftBoxView(
                 isPresented: $showDraftBox,
+                autoSaveEnabled: $autoSaveEnabled,
                 onSelectDraft: { draft in
                     lines = draftStorage.loadDrawingData(for: draft)
                 },
@@ -91,13 +156,22 @@ struct ContentView: View {
         .sheet(isPresented: $showColorPicker) {
             ColorPickerSheet(selectedColor: $currentColor, isPresented: $showColorPicker)
         }
-        .alert("清空画布", isPresented: $showClearConfirm) {
-            Button("取消", role: .cancel) { }
-            Button("清空", role: .destructive) {
-                lines = []
+        .sheet(isPresented: $showStylePicker) {
+            StylePickerView(canvasStyle: $canvasStyle, isPresented: $showStylePicker)
+        }
+        .sheet(isPresented: $showStickerPicker) {
+            StickerView(isPresented: $showStickerPicker) { sticker in
+                let centerSticker = PlacedSticker(sticker: sticker, position: CGPoint(x: 400, y: 300))
+                placedStickers.append(centerSticker)
             }
-        } message: {
-            Text("确定要清空画布吗？此操作无法撤销。")
+        }
+        .sheet(isPresented: $showFramePicker) {
+            FramePickerView(selectedFrame: $selectedFrame, isPresented: $showFramePicker)
+        }
+        .sheet(isPresented: $showShapePicker) {
+            ShapePickerView(isPresented: $showShapePicker) { shape in
+                selectedShapeType = shape
+            }
         }
         .onAppear {
             startAutoSave()
@@ -106,7 +180,10 @@ struct ContentView: View {
 
     private func startAutoSave() {
         Timer.scheduledTimer(withTimeInterval: autoSaveInterval, repeats: true) { _ in
-            saveThumbnail()
+            guard self.autoSaveEnabled else { return }
+            if self.lines != self.lastSavedLines {
+                self.saveThumbnail()
+            }
         }
     }
 
@@ -133,114 +210,354 @@ struct ContentView: View {
             }
         }
         _ = draftStorage.saveDraft(lines: lines, thumbnail: image)
+        lastSavedLines = lines
+    }
+
+    private func saveDraft() {
+        saveThumbnail()
+    }
+
+    private func exportImage() {
+        guard !lines.isEmpty || !placedStickers.isEmpty else { return }
+
+        let canvasWidth: CGFloat = UIScreen.main.bounds.width - 40
+        let canvasHeight: CGFloat = UIScreen.main.bounds.height - 160
+        let canvasSize = CGSize(width: canvasWidth, height: canvasHeight)
+
+        let image = ExportService.shared.renderCanvasToImage(
+            lines: lines,
+            placedStickers: placedStickers,
+            canvasSize: canvasSize,
+            backgroundColor: canvasStyle.backgroundColor,
+            showFrame: selectedFrame != .none,
+            frameType: selectedFrame
+        )
+
+        ExportService.shared.saveToPhotoLibrary(image: image) { success, error in
+            if success {
+                SoundService.shared.playExportSuccessSound()
+                print("图片已保存到相册")
+            } else if let error = error {
+                print("保存失败: \(error.localizedDescription)")
+            }
+        }
     }
 }
 
+// ========== 顶部栏 ==========
+struct TopToolbar: View {
+    let onNew: () -> Void
+    let onSave: () -> Void
+    let onUndo: () -> Void
+    let onExport: () -> Void
+    let onSettings: () -> Void
+
+    var body: some View {
+        HStack(spacing: 16) {
+            // 左侧：新建设置
+            HStack(spacing: 12) {
+                TopBarButton(icon: "doc.badge.plus", label: "新建") {
+                    onNew()
+                }
+                TopBarButton(icon: "folder", label: "草稿箱") {
+                    // 打开草稿箱
+                }
+            }
+
+            Spacer()
+
+            // 中间：撤销
+            HStack(spacing: 12) {
+                TopBarButton(icon: "arrow.uturn.backward", label: "撤销") {
+                    onUndo()
+                }
+            }
+
+            Spacer()
+
+            // 右侧：导出/设置
+            HStack(spacing: 12) {
+                TopBarButton(icon: "square.and.arrow.down", label: "导出") {
+                    onExport()
+                }
+                TopBarButton(icon: "gearshape", label: "设置") {
+                    onSettings()
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .frame(height: 60)
+        .background(Color(UIColor.systemBackground))
+    }
+}
+
+struct TopBarButton: View {
+    let icon: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.title3)
+                Text(label)
+                    .font(.caption2)
+            }
+            .foregroundColor(.primary)
+            .frame(minWidth: 50)
+        }
+    }
+}
+
+// ========== 底部工具栏 ==========
+struct BottomToolbar: View {
+    @Binding var selectedColor: Color
+    @Binding var lineWidth: CGFloat
+    @Binding var brushType: BrushType
+    @Binding var showColorPicker: Bool
+    @Binding var showStylePicker: Bool
+    @Binding var showStickerPicker: Bool
+    @Binding var showFramePicker: Bool
+    @Binding var showShapePicker: Bool
+    var canvasStyle: CanvasStyle
+    let onUndo: () -> Void
+    let onExport: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            // 颜色选择
+            Button {
+                showColorPicker = true
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(selectedColor)
+                        .frame(width: 48, height: 48)
+                        .shadow(color: .black.opacity(0.15), radius: 3, x: 0, y: 2)
+                    Circle()
+                        .stroke(Color.white, lineWidth: 3)
+                        .frame(width: 48, height: 48)
+                }
+            }
+            .padding(.horizontal, 12)
+
+            Divider()
+                .frame(height: 50)
+
+            // 画笔类型
+            HStack(spacing: 8) {
+                ForEach(BrushType.allCases, id: \.self) { type in
+                    BottomBrushButton(type: type, selectedType: $brushType)
+                }
+            }
+            .padding(.horizontal, 12)
+
+            Divider()
+                .frame(height: 50)
+
+            // 粗细滑块
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color.pink.opacity(0.5))
+                    .frame(width: 6, height: 6)
+                Slider(value: $lineWidth, in: 1...30, step: 1)
+                    .frame(width: 100)
+                    .tint(.pink)
+                Circle()
+                    .fill(Color.pink.opacity(0.5))
+                    .frame(width: 18, height: 18)
+            }
+            .padding(.horizontal, 12)
+
+            Divider()
+                .frame(height: 50)
+
+            // 特效区域
+            HStack(spacing: 8) {
+                BottomToolButton(icon: "star.fill", color: .yellow) {
+                    showStickerPicker = true
+                }
+                BottomToolButton(icon: "square.on.circle", color: .blue) {
+                    showShapePicker = true
+                }
+                BottomToolButton(icon: "sparkles", color: .purple) {
+                    showStylePicker = true
+                }
+                BottomToolButton(icon: "square.dashed", color: .orange) {
+                    showFramePicker = true
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+        .frame(height: 100)
+        .background(
+            Color(UIColor.systemBackground)
+                .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: -2)
+        )
+    }
+}
+
+struct BottomBrushButton: View {
+    let type: BrushType
+    @Binding var selectedType: BrushType
+
+    var isSelected: Bool { selectedType == type }
+
+    private var brushColor: Color {
+        switch type {
+        case .pencil: return .gray
+        case .pen: return .blue
+        case .brush: return .orange
+        case .eraser: return .pink
+        }
+    }
+
+    var body: some View {
+        Button {
+            selectedType = type
+            SoundService.shared.playToolSelectSound()
+        } label: {
+            Image(systemName: type.icon)
+                .font(.title3)
+                .foregroundColor(isSelected ? .white : brushColor)
+                .frame(width: 48, height: 48)
+                .background(
+                    Group {
+                        if isSelected {
+                            Circle()
+                                .fill(LinearGradient(colors: [brushColor, brushColor.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .shadow(color: brushColor.opacity(0.4), radius: 3, x: 0, y: 2)
+                        } else {
+                            Circle()
+                                .fill(Color.white)
+                                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                        }
+                    }
+                )
+        }
+    }
+}
+
+struct BottomToolButton: View {
+    let icon: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+                .frame(width: 48, height: 48)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(color.opacity(0.15))
+                )
+        }
+    }
+}
+
+// 装饰背景
+struct DecorativeBackground: View {
+    var body: some View {
+        GeometryReader { geometry in
+            Circle()
+                .fill(
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            Color.purple.opacity(0.05),
+                            Color.purple.opacity(0.0)
+                        ]),
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 150
+                    )
+                )
+                .frame(width: 300, height: 300)
+                .offset(x: -50, y: geometry.size.height - 100)
+        }
+    }
+}
+
+// Color Picker Sheet
 struct ColorPickerSheet: View {
     @Binding var selectedColor: Color
     @Binding var isPresented: Bool
-    @State private var brightness: Double = 1.0
+    @State private var brightness: Double = 0.8
 
-    // 蛋糕12切片颜色：红粉橙黄浅绿绿青天蓝蓝深紫紫棕
-    let cakeColors: [(name: String, r: Double, g: Double, b: Double)] = [
-        ("红", 1.0, 0.25, 0.25),
-        ("粉", 1.0, 0.55, 0.6),
-        ("橙", 1.0, 0.5, 0.1),
-        ("黄", 1.0, 0.9, 0.15),
-        ("浅绿", 0.5, 0.9, 0.5),
-        ("绿", 0.25, 0.7, 0.25),
-        ("青", 0.2, 0.75, 0.75),
-        ("天蓝", 0.4, 0.6, 0.95),
-        ("蓝", 0.2, 0.4, 0.85),
-        ("深紫", 0.45, 0.15, 0.7),
-        ("紫", 0.65, 0.2, 0.8),
-        ("棕", 0.55, 0.35, 0.15)
+    let hueColors: [(name: String, hue: Double)] = [
+        ("红", 0.0), ("橙红", 25.0), ("橙", 35.0), ("橙黄", 50.0),
+        ("黄", 60.0), ("黄绿", 90.0), ("绿", 135.0), ("青绿", 165.0),
+        ("青", 185.0), ("蓝", 220.0), ("蓝紫", 265.0), ("紫", 285.0)
+    ]
+
+    let rings: [Double] = [1.0, 0.80, 0.60, 0.40, 0.20]
+
+    let quickColors: [Color] = [
+        .red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .brown, .black, .gray, .white
     ]
 
     var body: some View {
         NavigationView {
-            VStack {
-                Text("选一个颜色")
+            VStack(spacing: 20) {
+                Text("选择颜色")
                     .font(.title2.bold())
-                    .padding(.top, 20)
+                    .padding(.top, 10)
 
-                Text("点击蛋糕切片选择颜色")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-
-                // 蛋糕颜色选择器
                 ZStack {
-                    // 中心白点
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 30, height: 30)
+                    ColorWheelRing(rings: rings, hueColors: hueColors, brightness: brightness, selectedColor: $selectedColor, isPresented: $isPresented)
+                        .frame(width: 380, height: 380)
+                }
 
-                    // 12个扇形切片
-                    ForEach(0..<12, id: \.self) { sliceIndex in
-                        CakeSlice(
-                            sliceIndex: sliceIndex,
-                            color: cakeColors[sliceIndex],
-                            nextColor: sliceIndex < 11 ? cakeColors[sliceIndex + 1] : cakeColors[0],
-                            maxRadius: 150.0
-                        )
-                        .onTapGesture {
-                            // 点击时随机选择该颜色的浅、中、深色
-                            let color = cakeColors[sliceIndex]
-                            let shade = Int.random(in: 0...2)
-                            let factor: Double = shade == 0 ? 0.6 : (shade == 1 ? 1.0 : 0.3)
-                            selectedColor = Color(
-                                red: color.r * factor,
-                                green: color.g * factor,
-                                blue: color.b * factor
-                            ).opacity(brightness)
-                            isPresented = false
-                        }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 4)], spacing: 4) {
+                    ForEach(Array(hueColors.enumerated()), id: \.offset) { index, hue in
+                        Text(hue.name)
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
                     }
                 }
-                .padding(40)
+                .padding(.horizontal, 20)
 
-                // 切片颜色标签
-                HStack(spacing: 4) {
-                    ForEach(0..<12, id: \.self) { index in
-                        VStack(spacing: 2) {
+                VStack(spacing: 8) {
+                    Text("快捷颜色")
+                        .font(.subheadline.bold())
+                        .foregroundColor(.gray)
+
+                    HStack(spacing: 12) {
+                        ForEach(quickColors, id: \.self) { color in
                             Circle()
-                                .fill(Color(red: cakeColors[index].r, green: cakeColors[index].g, blue: cakeColors[index].b))
-                                .frame(width: 14, height: 14)
-                            Text(cakeColors[index].name)
-                                .font(.system(size: 8))
-                                .foregroundColor(.gray)
+                                .fill(color)
+                                .frame(width: 36, height: 36)
+                                .overlay(Circle().stroke(Color.black.opacity(0.1), lineWidth: 1))
+                                .onTapGesture {
+                                    selectedColor = color
+                                }
                         }
                     }
                 }
-                .padding(.top, 5)
+                .padding(.top, 10)
 
-                // 当前颜色
+                VStack(spacing: 8) {
+                    HStack {
+                        Image(systemName: "sun.min").foregroundColor(.gray)
+                        Slider(value: $brightness, in: 0.2...1.0).tint(.orange)
+                        Image(systemName: "sun.max.fill").foregroundColor(.yellow)
+                    }
+                    Text("亮度: \(Int(brightness * 100))%")
+                        .font(.caption).foregroundColor(.gray)
+                }
+                .padding(.horizontal, 30)
+                .padding(.top, 10)
+
                 HStack {
                     Text("当前:")
                         .font(.headline)
                     Circle()
                         .fill(selectedColor)
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Circle()
-                                .stroke(Color.black.opacity(0.2), lineWidth: 2)
-                        )
-                }
-                .padding(.top, 15)
-
-                // 亮度滑块
-                VStack(spacing: 8) {
-                    HStack {
-                        Image(systemName: "sun.min")
-                            .foregroundColor(.gray)
-                        Slider(value: $brightness, in: 0.3...1.0)
-                            .tint(Color.orange)
-                        Image(systemName: "sun.max.fill")
-                            .foregroundColor(.yellow)
-                    }
-                    Text("亮度: \(Int(brightness * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                        .frame(width: 60, height: 60)
+                        .overlay(Circle().stroke(Color.black.opacity(0.2), lineWidth: 2))
+                    Spacer()
                 }
                 .padding(.horizontal, 30)
                 .padding(.top, 10)
@@ -260,128 +577,81 @@ struct ColorPickerSheet: View {
     }
 }
 
-// 蛋糕扇形切片 - 带渐变
-struct CakeSlice: View {
-    let sliceIndex: Int
-    let color: (name: String, r: Double, g: Double, b: Double)
-    let nextColor: (name: String, r: Double, g: Double, b: Double)?
-    let maxRadius: CGFloat
+struct ColorWheelRing: View {
+    let rings: [Double]
+    let hueColors: [(name: String, hue: Double)]
+    let brightness: Double
+    @Binding var selectedColor: Color
+    @Binding var isPresented: Bool
 
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let sliceAngle: Double = 30.0
-            let startAngle = Double(sliceIndex) * sliceAngle - 90
-            let endAngle = startAngle + sliceAngle
+            let maxRadius = min(geometry.size.width, geometry.size.height) / 2
 
             ZStack {
-                // 外层 - 浅色（可点击选择浅色）
-                let outerRadius = maxRadius
-                let innerRadius = maxRadius * 0.55
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 40, height: 40)
+                    .overlay(Circle().stroke(Color.gray.opacity(0.3), lineWidth: 1))
+                    .onTapGesture {
+                        selectedColor = Color.white
+                        isPresented = false
+                    }
 
-                GradientPieSlice(
-                    center: center,
-                    innerRadius: innerRadius,
-                    outerRadius: outerRadius,
-                    startAngle: startAngle,
-                    endAngle: endAngle,
-                    color1: Color(
-                        red: color.r * 0.6,
-                        green: color.g * 0.6,
-                        blue: color.b * 0.6
-                    ),
-                    color2: Color(
-                        red: color.r * 0.4,
-                        green: color.g * 0.4,
-                        blue: color.b * 0.4
-                    )
-                )
-
-                // 中层 - 主色（可点击选择主色）
-                let midOuterRadius = maxRadius * 0.52
-                let midInnerRadius = maxRadius * 0.25
-
-                PieSlice(
-                    center: center,
-                    innerRadius: midInnerRadius,
-                    outerRadius: midOuterRadius,
-                    startAngle: startAngle,
-                    endAngle: endAngle
-                )
-                .fill(Color(
-                    red: color.r,
-                    green: color.g,
-                    blue: color.b
-                ))
-
-                // 内层 - 深色（可点击选择深色）
-                let darkOuterRadius = maxRadius * 0.22
-                let darkInnerRadius: CGFloat = 15
-
-                PieSlice(
-                    center: center,
-                    innerRadius: darkInnerRadius,
-                    outerRadius: darkOuterRadius,
-                    startAngle: startAngle,
-                    endAngle: endAngle
-                )
-                .fill(Color(
-                    red: color.r * 0.3,
-                    green: color.g * 0.3,
-                    blue: color.b * 0.3
-                ))
+                ColorWheelRingsView(rings: rings, hueColors: hueColors, brightness: brightness, center: center, maxRadius: maxRadius, selectedColor: $selectedColor, isPresented: $isPresented)
             }
         }
     }
 }
 
-// 渐变扇形
-struct GradientPieSlice: View {
+struct ColorWheelRingsView: View {
+    let rings: [Double]
+    let hueColors: [(name: String, hue: Double)]
+    let brightness: Double
     let center: CGPoint
-    let innerRadius: CGFloat
-    let outerRadius: CGFloat
-    let startAngle: Double
-    let endAngle: Double
-    let color1: Color
-    let color2: Color
+    let maxRadius: CGFloat
+    @Binding var selectedColor: Color
+    @Binding var isPresented: Bool
 
     var body: some View {
-        GeometryReader { geometry in
-            let rect = geometry.size
-            let midAngle = (startAngle + endAngle) / 2
+        ColorWheelSingleRing(saturation: rings[0], brightness: brightness, outerRadius: maxRadius, innerRadius: maxRadius * 0.72, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
+        ColorWheelSingleRing(saturation: rings[1], brightness: brightness, outerRadius: maxRadius * 0.72, innerRadius: maxRadius * 0.52, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
+        ColorWheelSingleRing(saturation: rings[2], brightness: brightness, outerRadius: maxRadius * 0.52, innerRadius: maxRadius * 0.34, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
+        ColorWheelSingleRing(saturation: rings[3], brightness: brightness, outerRadius: maxRadius * 0.34, innerRadius: maxRadius * 0.18, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
+        ColorWheelSingleRing(saturation: rings[4], brightness: brightness, outerRadius: maxRadius * 0.18, innerRadius: maxRadius * 0.08, hueColors: hueColors, center: center, selectedColor: $selectedColor, isPresented: $isPresented)
+    }
+}
 
-            ZStack {
-                // 左半边
-                PieSlice(
-                    center: center,
-                    innerRadius: innerRadius,
-                    outerRadius: outerRadius,
-                    startAngle: startAngle,
-                    endAngle: midAngle
-                )
-                .fill(color1)
+struct ColorWheelSingleRing: View {
+    let saturation: Double
+    let brightness: Double
+    let outerRadius: CGFloat
+    let innerRadius: CGFloat
+    let hueColors: [(name: String, hue: Double)]
+    let center: CGPoint
+    @Binding var selectedColor: Color
+    @Binding var isPresented: Bool
 
-                // 右半边（渐变到下一个颜色）
-                PieSlice(
-                    center: center,
-                    innerRadius: innerRadius,
-                    outerRadius: outerRadius,
-                    startAngle: midAngle,
-                    endAngle: endAngle
-                )
-                .fill(
-                    LinearGradient(
-                        colors: [color1, color2],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+    var body: some View {
+        ZStack {
+            ForEach(0..<12, id: \.self) { hueIndex in
+                let hue = hueColors[hueIndex].hue
+                let sliceAngle = 30.0
+                let startAngle = Double(hueIndex) * sliceAngle - 90
+                let endAngle = startAngle + sliceAngle
+
+                PieSlice(center: center, innerRadius: innerRadius, outerRadius: outerRadius, startAngle: startAngle, endAngle: endAngle)
+                    .fill(Color(hue: hue / 360, saturation: saturation, brightness: brightness))
+                    .onTapGesture {
+                        selectedColor = Color(hue: hue / 360, saturation: saturation, brightness: brightness)
+                        isPresented = false
+                    }
             }
         }
     }
 }
 
-// 扇形
 struct PieSlice: Shape {
     let center: CGPoint
     let innerRadius: CGFloat
@@ -391,46 +661,88 @@ struct PieSlice: Shape {
 
     func path(in rect: CGRect) -> Path {
         var path = Path()
-
-        let innerStart = CGPoint(
-            x: center.x + innerRadius * cos(CGFloat(startAngle) * .pi / 180),
-            y: center.y + innerRadius * sin(CGFloat(startAngle) * .pi / 180)
-        )
-
-        let outerStart = CGPoint(
-            x: center.x + outerRadius * cos(CGFloat(startAngle) * .pi / 180),
-            y: center.y + outerRadius * sin(CGFloat(startAngle) * .pi / 180)
-        )
-
-        let outerEnd = CGPoint(
-            x: center.x + outerRadius * cos(CGFloat(endAngle) * .pi / 180),
-            y: center.y + outerRadius * sin(CGFloat(endAngle) * .pi / 180)
-        )
-
-        let innerEnd = CGPoint(
-            x: center.x + innerRadius * cos(CGFloat(endAngle) * .pi / 180),
-            y: center.y + innerRadius * sin(CGFloat(endAngle) * .pi / 180)
-        )
+        let innerStart = CGPoint(x: center.x + innerRadius * cos(CGFloat(startAngle) * .pi / 180), y: center.y + innerRadius * sin(CGFloat(startAngle) * .pi / 180))
+        let outerStart = CGPoint(x: center.x + outerRadius * cos(CGFloat(startAngle) * .pi / 180), y: center.y + outerRadius * sin(CGFloat(startAngle) * .pi / 180))
+        let outerEnd = CGPoint(x: center.x + outerRadius * cos(CGFloat(endAngle) * .pi / 180), y: center.y + outerRadius * sin(CGFloat(endAngle) * .pi / 180))
+        let innerEnd = CGPoint(x: center.x + innerRadius * cos(CGFloat(endAngle) * .pi / 180), y: center.y + innerRadius * sin(CGFloat(endAngle) * .pi / 180))
 
         path.move(to: innerStart)
         path.addLine(to: outerStart)
-        path.addArc(
-            center: center,
-            radius: outerRadius,
-            startAngle: .degrees(startAngle),
-            endAngle: .degrees(endAngle),
-            clockwise: false
-        )
+        path.addArc(center: center, radius: outerRadius, startAngle: .degrees(startAngle), endAngle: .degrees(endAngle), clockwise: false)
         path.addLine(to: innerEnd)
-        path.addArc(
-            center: center,
-            radius: innerRadius,
-            startAngle: .degrees(endAngle),
-            endAngle: .degrees(startAngle),
-            clockwise: true
-        )
+        path.addArc(center: center, radius: innerRadius, startAngle: .degrees(endAngle), endAngle: .degrees(startAngle), clockwise: true)
         path.closeSubpath()
-
         return path
+    }
+}
+
+// 风格选择器
+struct StylePickerView: View {
+    @Binding var canvasStyle: CanvasStyle
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 20) {
+                Text("选择画布风格")
+                    .font(.title2.bold())
+                    .padding(.top, 20)
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], spacing: 16) {
+                    ForEach(CanvasStyle.allCases, id: \.self) { style in
+                        StyleCard(style: style, isSelected: canvasStyle == style)
+                            .onTapGesture {
+                                canvasStyle = style
+                                isPresented = false
+                            }
+                    }
+                }
+                .padding()
+
+                Spacer()
+            }
+            .navigationTitle("画布风格")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") { isPresented = false }
+                }
+            }
+        }
+    }
+}
+
+struct StyleCard: View {
+    let style: CanvasStyle
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(style.backgroundColor)
+                .frame(height: 100)
+                .overlay(
+                    VStack(spacing: 4) {
+                        Path { path in
+                            path.move(to: CGPoint(x: 20, y: 30))
+                            path.addQuadCurve(to: CGPoint(x: 60, y: 50), control: CGPoint(x: 40, y: 20))
+                        }
+                        .stroke(Color.gray.opacity(style.lineOpacity), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                        Path { path in
+                            path.move(to: CGPoint(x: 30, y: 60))
+                            path.addQuadCurve(to: CGPoint(x: 80, y: 40), control: CGPoint(x: 50, y: 80))
+                        }
+                        .stroke(Color.gray.opacity(style.lineOpacity * 0.8), style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    }
+                )
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3))
+
+            Text(style.rawValue)
+                .font(.subheadline.bold())
+                .foregroundColor(isSelected ? .blue : .primary)
+            Text(style.description)
+                .font(.caption)
+                .foregroundColor(.gray)
+        }
     }
 }
